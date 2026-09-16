@@ -11,19 +11,23 @@ import org.gradle.api.provider.Provider;
 import org.gradle.api.publish.PublishingExtension;
 import org.gradle.api.publish.maven.MavenPublication;
 import org.gradle.api.tasks.bundling.Jar;
+import org.gradle.plugin.devel.GradlePluginDevelopmentExtension;
 import org.gradle.plugins.signing.SigningExtension;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Library publishing: ScalaDoc {@code javadocJar} before {@code withJavadocJar()},
- * sources jar, jar duplicates/manifest, Maven publication POM, in-memory signing.
- * Does not apply {@code java}, {@code scala}, {@code maven-publish}, or {@code signing}.
+ * Publishing: ScalaDoc {@code javadocJar} before {@code withJavadocJar()}, sources
+ * jar, jar duplicates/manifest, Maven publication POM, in-memory signing.
+ * Creates a {@code library} publication unless {@code java-gradle-plugin} is applied
+ * (that plugin already publishes {@code pluginMaven} plus markers). Does not apply
+ * {@code java}, {@code scala}, {@code maven-publish}, or {@code signing}.
  */
 public final class ConventionsPublishPlugin implements Plugin<Project> {
   public static final String PLUGIN_ID = "org.podval.conventions.publish";
   public static final String EXTENSION_NAME = "podvalPublish";
   public static final String LIBRARY_PUBLICATION = "library";
+  public static final String JAVA_GRADLE_PLUGIN_ID = "java-gradle-plugin";
   public static final String DEFAULT_ORG_NAME = "Podval Group";
   public static final String DEFAULT_ORG_URL = "https://www.podval.org";
   public static final String DEFAULT_DEVELOPER_EMAIL = "dub@podval.org";
@@ -45,6 +49,9 @@ public final class ConventionsPublishPlugin implements Plugin<Project> {
     project.getPluginManager().withPlugin("java", unused -> configureJava(project, extension));
     project.getPluginManager().withPlugin("maven-publish", unused -> configurePublishing(project, extension));
     project.getPluginManager().withPlugin("signing", unused -> configureSigning(project));
+    project.getPluginManager().withPlugin(JAVA_GRADLE_PLUGIN_ID, unused ->
+      configureGradlePluginMetadata(project, extension)
+    );
   }
 
   private static void registerJavadocJarFromScalaDoc(Project project) {
@@ -90,6 +97,9 @@ public final class ConventionsPublishPlugin implements Plugin<Project> {
   }
 
   private static void maybeCreateLibraryPublication(Project project) {
+    if (project.getPluginManager().hasPlugin(JAVA_GRADLE_PLUGIN_ID)) {
+      return;
+    }
     if (!project.getPluginManager().hasPlugin("java")) {
       return;
     }
@@ -154,6 +164,15 @@ public final class ConventionsPublishPlugin implements Plugin<Project> {
       developer.getOrganizationUrl().set(extension.getOrgUrl());
       developer.getTimezone().set("-5");
     }));
+  }
+
+  private static void configureGradlePluginMetadata(Project project, PublishExtension extension) {
+    GradlePluginDevelopmentExtension gradlePlugin =
+      project.getExtensions().getByType(GradlePluginDevelopmentExtension.class);
+    Provider<String> gitHubRepositoryUrl = extension.getGitHubRepository()
+      .map(repo -> "https://github.com/" + repo);
+    gradlePlugin.getWebsite().set(gitHubRepositoryUrl);
+    gradlePlugin.getVcsUrl().set(gitHubRepositoryUrl.map(url -> url + ".git"));
   }
 
   private static void configureSigning(Project project) {

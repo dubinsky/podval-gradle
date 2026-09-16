@@ -218,6 +218,102 @@ final class ConventionsPluginTest {
   }
 
   @Test
+  void scalaVersionFromGradleProperties() throws IOException {
+    writeSettingsWithConventions();
+    Files.writeString(
+      projectDir.resolve("gradle.properties"),
+      "scalaVersion=3.9.0\n",
+      StandardCharsets.UTF_8
+    );
+    writeBuild(
+      """
+      plugins {
+        id 'scala'
+        id 'org.podval.conventions'
+      }
+      tasks.register('assertScalaVersion') {
+        doLast {
+          assert scala.scalaVersion.get() == '3.9.0'
+        }
+      }
+      """
+    );
+    BuildResult result = runner("assertScalaVersion").build();
+    assertEquals(TaskOutcome.SUCCESS, result.task(":assertScalaVersion").getOutcome());
+  }
+
+  @Test
+  void javaGradlePluginDoesNotCreateLibraryPublication() throws IOException {
+    writeSettingsWithConventions();
+    writeBuild(
+      """
+      plugins {
+        id 'java-gradle-plugin'
+        id 'maven-publish'
+        id 'org.podval.conventions.publish'
+      }
+      podvalPublish {
+        gitHubRepository = 'dubinsky/xml'
+        name = 'Test Plugin'
+      }
+      gradlePlugin {
+        plugins {
+          dummy {
+            id = 'conventions.test.dummy'
+            implementationClass = 'org.gradle.api.plugins.JavaLibraryPlugin'
+          }
+        }
+      }
+      tasks.register('assertPublications') {
+        doLast {
+          assert publishing.publications.findByName('library') == null
+          assert publishing.publications.findByName('pluginMaven') != null
+        }
+      }
+      """
+    );
+    BuildResult result = runner("assertPublications").build();
+    assertEquals(TaskOutcome.SUCCESS, result.task(":assertPublications").getOutcome());
+  }
+
+  @Test
+  void javaGradlePluginPomAndWebsiteFromExtension() throws IOException {
+    writeSettingsWithConventions();
+    writeBuild(
+      """
+      plugins {
+        id 'java-gradle-plugin'
+        id 'maven-publish'
+        id 'org.podval.conventions.publish'
+      }
+      podvalPublish {
+        gitHubRepository = 'dubinsky/xml'
+        name = 'Test Plugin'
+        inceptionYear = '2026'
+      }
+      gradlePlugin {
+        plugins {
+          dummy {
+            id = 'conventions.test.dummy'
+            implementationClass = 'org.gradle.api.plugins.JavaLibraryPlugin'
+          }
+        }
+      }
+      """
+    );
+    BuildResult result = runner("generatePomFileForPluginMavenPublication").build();
+    assertEquals(
+      TaskOutcome.SUCCESS,
+      result.task(":generatePomFileForPluginMavenPublication").getOutcome()
+    );
+    String pom = Files.readString(
+      projectDir.resolve("build/publications/pluginMaven/pom-default.xml")
+    );
+    assertTrue(pom.contains("<name>Test Plugin</name>"), pom);
+    assertTrue(pom.contains("<url>https://github.com/dubinsky/xml</url>"), pom);
+  }
+
+  @Test
   void configurationCacheOnHelp() throws IOException {
     writeSettingsWithConventions();
     writeBuild(

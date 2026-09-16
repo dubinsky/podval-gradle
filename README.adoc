@@ -40,9 +40,14 @@ id 'org.podval.conventions' version '0.1.0'
 id 'org.podval.conventions.publish' version '0.1.0'
 ----
 
-Do not publish until at least one library (`xml` or `site-publisher`) dogfoods via
-`includeBuild`. Then Central, then pin versions in consumers so CI works without a
-second checkout.
+TODO: publish to Maven Central, then pin versions in consumers so CI works without
+`includeBuild`.
+
+TODO: after that, self-apply the published plugins here (settings + conventions +
+publish) so this build drops the duplicated Foojay/DRM, versions filter, toolchain,
+POM, and signing. Keep `nmcp` and `java-gradle-plugin` / `gradlePlugin { }`. Do not
+`includeBuild` this repo from itself; the pinned Central version is last release
+while the next one is developed.
 
 == Consumer shape
 
