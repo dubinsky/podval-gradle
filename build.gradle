@@ -1,0 +1,150 @@
+plugins {
+  id 'java-gradle-plugin'
+  id 'maven-publish'
+  id 'signing'
+  id 'io.github.ben-manes.versions' version '0.61.0'
+}
+
+description = 'Shared Gradle conventions for Podval (and other) projects'
+group = 'org.podval.conventions'
+
+final String gitHubRepository = 'dubinsky/podval-gradle'
+final String gitHubRepositoryUrl = "https://github.com/$gitHubRepository"
+final String orgName = 'Podval Group'
+final String orgUrl = 'https://www.podval.org'
+
+java {
+  toolchain.languageVersion = JavaLanguageVersion.of(25)
+  withSourcesJar()
+  withJavadocJar()
+}
+
+dependencies {
+  implementation 'io.github.ben-manes:gradle-versions-plugin:0.61.0'
+  implementation 'org.gradle.toolchains:foojay-resolver:1.0.0'
+  testImplementation 'org.junit.jupiter:junit-jupiter:5.13.4'
+  testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+gradlePlugin {
+  website = gitHubRepositoryUrl
+  vcsUrl = "${gitHubRepositoryUrl}.git"
+  plugins {
+    settingsConventions {
+      id = 'org.podval.conventions.settings'
+      implementationClass = 'org.podval.conventions.ConventionsSettingsPlugin'
+      displayName = 'Podval settings conventions'
+      description = 'Foojay toolchain resolver and Maven Central for dependency resolution'
+    }
+    conventions {
+      id = 'org.podval.conventions'
+      implementationClass = 'org.podval.conventions.ConventionsPlugin'
+      displayName = 'Podval project conventions'
+      description = 'dependencyUpdates filters, Java 25 toolchain, Scala 3 compiler flags'
+    }
+    publishConventions {
+      id = 'org.podval.conventions.publish'
+      implementationClass = 'org.podval.conventions.ConventionsPublishPlugin'
+      displayName = 'Podval publish conventions'
+      description = 'Maven Central publication POM, sources/javadoc jars, and in-memory signing'
+    }
+  }
+}
+
+tasks.named('test', Test) {
+  useJUnitPlatform()
+}
+
+tasks.named('javadoc', Javadoc) {
+  options.addStringOption('Xdoclint:none', '-quiet')
+}
+
+def isNonStable = { String version ->
+  boolean stableKeyword = ['RELEASE', 'FINAL', 'GA'].any { it -> version.toUpperCase().contains(it) }
+  String regex = /^[0-9,.v-]+(-r)?$/
+  return !stableKeyword && !(version ==~ regex)
+}
+
+def hasPaddedNumericComponent = { String version ->
+  version.tokenize('.-').any { it.length() > 1 && it ==~ /0\d+/ }
+}
+
+tasks.named('dependencyUpdates').configure {
+  rejectVersionIf {
+    isNonStable(it.candidate.version) || hasPaddedNumericComponent(it.candidate.version)
+  }
+}
+
+def expectedPluginVersion = version.toString()
+def checkReadmeVersion = tasks.register('checkReadmeVersion') {
+  group = 'verification'
+  description = 'Fails if README.adoc plugin versions do not match project.version.'
+  def readmeFile = file('README.adoc')
+  inputs.file(readmeFile)
+  inputs.property('expected', expectedPluginVersion)
+  doLast {
+    def found = (readmeFile.getText('UTF-8') =~ /id 'org\.podval\.conventions[^']*' version '[0-9][0-9A-Za-z._-]*'/).findAll().toSet()
+    def expected = [
+      "id 'org.podval.conventions.settings' version '${expectedPluginVersion}'",
+      "id 'org.podval.conventions' version '${expectedPluginVersion}'",
+      "id 'org.podval.conventions.publish' version '${expectedPluginVersion}'"
+    ] as Set
+    if (found != expected) {
+      throw new GradleException("README.adoc plugin id versions ${found} must all be ${expected}")
+    }
+  }
+}
+tasks.named('check') { dependsOn(checkReadmeVersion) }
+
+publishing {
+  publications.withType(MavenPublication).configureEach { MavenPublication publication ->
+    pom {
+      name = publication.name == 'pluginMaven' ? 'Podval Gradle Conventions' : publication.name
+      description = project.description
+      url = gitHubRepositoryUrl
+      inceptionYear = '2026'
+      scm {
+        url = gitHubRepositoryUrl
+        connection = "scm:git:https://github.com/${gitHubRepository}.git"
+        developerConnection = "scm:git:ssh://git@github.com/${gitHubRepository}.git"
+      }
+      issueManagement {
+        system = 'GitHub'
+        url = "$gitHubRepositoryUrl/issues"
+      }
+      ciManagement {
+        system = 'GitHub Actions'
+        url = "$gitHubRepositoryUrl/actions"
+      }
+      licenses {
+        license {
+          name = 'Apache-2.0'
+          url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+        }
+      }
+      organization {
+        name = orgName
+        url = orgUrl
+      }
+      developers {
+        developer {
+          id = 'dub'
+          name = 'Leonid Dubinsky'
+          email = 'dub@podval.org'
+          url = 'https://dub.podval.org'
+          organization = orgName
+          organizationUrl = orgUrl
+          timezone = '-5'
+        }
+      }
+    }
+  }
+}
+
+signing {
+  def key = providers.gradleProperty('signingKey')
+  def password = providers.gradleProperty('signingPassword')
+  required = key.isPresent()
+  useInMemoryPgpKeys(key.getOrNull(), password.getOrNull())
+  sign publishing.publications
+}
