@@ -9,11 +9,23 @@ Shared Gradle setup for Podval (and other) projects: toolchain, Scala 3 flags,
 Java binary plugins (`java-gradle-plugin`), same shape as
 `org.podval.tools.site-publisher`. Plugin ids:
 
-| Plugin id | Applied in | Does |
-|---|---|---|
-| `org.podval.conventions.settings` | `settings.gradle` | Foojay toolchain resolver; `dependencyResolutionManagement { repositories { mavenCentral() } }`. Does **not** apply `com.gradleup.nmcp.settings` (publishing builds keep that line). |
-| `org.podval.conventions` | `build.gradle` | Applies `io.github.ben-manes.versions` and the shared `rejectVersionIf` (non-stable + padded numeric `0.017`). If `java` is present (covers `java-library` / `scala`): Java 25 toolchain. If `scala` is present: `-release:25`, `-new-syntax`, `-feature`, `-language:strictEquality`, `-source:future`. Does **not** skip `compileJava`. |
-| `org.podval.conventions.publish` | `build.gradle` (libraries only) | `javadocJar` from ScalaDoc **before** `withJavadocJar()`; `withSourcesJar()`; jar `duplicatesStrategy = EXCLUDE` and Implementation-* manifest; Maven `library` publication POM (SCM, issues, CI, Apache-2.0, developer) and in-memory signing from `signingKey` / `signingPassword`. |
+`org.podval.conventions.settings` (`settings.gradle`)::
+Foojay toolchain resolver; `dependencyResolutionManagement { repositories { mavenCentral() } }`.
+Does **not** apply `com.gradleup.nmcp.settings` (publishing builds keep that line).
+`org.podval.conventions` (`build.gradle`)::
+Applies `io.github.ben-manes.versions` and the shared `rejectVersionIf` (non-stable + padded numeric `0.017`).
+If `java` is present (covers `java-library` / `scala`): Java 25 toolchain.
+If `scala` is present: `-release:25`, `-new-syntax`, `-feature`, `-language:strictEquality`, `-source:future`,
+and `scala.scalaVersion` from the `scalaVersion` Gradle property when that property is set.
+Does **not** skip `compileJava`.
+`org.podval.conventions.publish` (`build.gradle`; libraries and Gradle-plugin projects)::
+`javadocJar` from ScalaDoc **before** `withJavadocJar()`; `withSourcesJar()`;
+jar `duplicatesStrategy = EXCLUDE` and Implementation-* manifest;
+Maven publication POM (SCM, issues, CI, Apache-2.0, developer) and in-memory signing from
+`signingKey` / `signingPassword`.
+Creates a `library` publication unless `java-gradle-plugin` is applied
+(`pluginMaven` + markers already cover the jar).
+Sets `gradlePlugin.website` / `vcsUrl` from `gitHubRepository`.
 
 `org.podval.conventions` does not apply `scala` or `java` — the consumer still does.
 Markup-only sites (`www.podval.org`, MathWorlds) can apply it without `scala` and still
@@ -41,11 +53,12 @@ pluginManagement {
     mavenCentral()
     gradlePluginPortal()
   }
-  final File conventionsDir = file(
+  // String path: a File would call Settings.includeBuild (not a plugin build)
+  // and `org.podval.conventions.settings` would not resolve.
+  final String conventionsDir =
     providers.gradleProperty('podvalGradleDir').getOrElse('../podval-gradle')
-  )
-  if (conventionsDir.isDirectory() && new File(conventionsDir, 'settings.gradle').isFile()) {
-    includeBuild(conventionsDir)
+  if (file(conventionsDir).isDirectory() && file("${conventionsDir}/settings.gradle").isFile()) {
+    includeBuild conventionsDir
   }
 }
 plugins {
@@ -56,7 +69,6 @@ plugins {
 plugins {
   id 'scala'
   id 'org.podval.conventions'
-  // libraries:
   id 'org.podval.conventions.publish'
 }
 ----
@@ -90,10 +102,10 @@ podvalPublish {
 }
 ----
 
-OpenTorah can apply settings + `org.podval.conventions` and either use this publish
-plugin with `orgName = 'Open Torah Project'` / `developerEmail = 'dub@opentorah.org'`,
-or keep its own `configure.gradle` publishing. Do not special-case OpenTorah in the
-plugin code.
+OpenTorah uses this publish plugin with `orgName = 'Open Torah Project'` /
+`developerEmail = 'dub@opentorah.org'`. Do not special-case OpenTorah in the plugin
+code. A Gradle-plugin project (`java-gradle-plugin`) still owns `gradlePlugin {
+plugins { } }` (id, implementation class, tags).
 
 nmcp (`com.gradleup.nmcp.settings`, `nmcpSettings { centralPortal { … } }`) stays in
 the library’s `settings.gradle`. It is already one block and is not used by sites.
