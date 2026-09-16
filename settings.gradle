@@ -1,6 +1,12 @@
+pluginManagement {
+  repositories {
+    mavenCentral()
+    gradlePluginPortal()
+  }
+}
+
 plugins {
-  // Auto-provision JDKs for the Java toolchain (e.g. 25 when only 21 is installed).
-  id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+  id 'org.podval.conventions.settings' version '0.1.0'
   // Applies com.gradleup.nmcp to maven-publish projects and aggregation on the root.
   // https://gradleup.com/nmcp/
   id 'com.gradleup.nmcp.settings' version '1.6.2'
@@ -8,9 +14,10 @@ plugins {
 
 rootProject.name = 'org.podval.conventions'
 
+// mavenCentral() comes from conventions.settings. This project's implementation
+// deps (gradle-versions-plugin, foojay-resolver) are on the Plugin Portal.
 dependencyResolutionManagement {
   repositories {
-    mavenCentral()
     gradlePluginPortal()
   }
 }

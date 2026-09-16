@@ -2,21 +2,19 @@ plugins {
   id 'java-gradle-plugin'
   id 'maven-publish'
   id 'signing'
-  id 'io.github.ben-manes.versions' version '0.63.1'
+  // Same artifact as settings 0.1.0 already on the classpath; a version here fails
+  // ("plugin is already on the classpath with an unknown version").
+  id 'org.podval.conventions'
+  id 'org.podval.conventions.publish'
 }
 
 description = 'Shared Gradle conventions for Podval (and other) projects'
 group = 'org.podval.conventions'
 
-final String gitHubRepository = 'dubinsky/podval-gradle'
-final String gitHubRepositoryUrl = "https://github.com/$gitHubRepository"
-final String orgName = 'Podval Group'
-final String orgUrl = 'https://www.podval.org'
-
-java {
-  toolchain.languageVersion = JavaLanguageVersion.of(25)
-  withSourcesJar()
-  withJavadocJar()
+podvalPublish {
+  gitHubRepository = 'dubinsky/podval-gradle'
+  name = 'Podval Gradle Conventions'
+  inceptionYear = '2026'
 }
 
 dependencies {
@@ -27,8 +25,6 @@ dependencies {
 }
 
 gradlePlugin {
-  website = gitHubRepositoryUrl
-  vcsUrl = "${gitHubRepositoryUrl}.git"
   plugins {
     settingsConventions {
       id = 'org.podval.conventions.settings'
@@ -59,22 +55,6 @@ tasks.named('javadoc', Javadoc) {
   options.addStringOption('Xdoclint:none', '-quiet')
 }
 
-def isNonStable = { String version ->
-  boolean stableKeyword = ['RELEASE', 'FINAL', 'GA'].any { it -> version.toUpperCase().contains(it) }
-  String regex = /^[0-9,.v-]+(-r)?$/
-  return !stableKeyword && !(version ==~ regex)
-}
-
-def hasPaddedNumericComponent = { String version ->
-  version.tokenize('.-').any { it.length() > 1 && it ==~ /0\d+/ }
-}
-
-tasks.named('dependencyUpdates').configure {
-  rejectVersionIf {
-    isNonStable(it.candidate.version) || hasPaddedNumericComponent(it.candidate.version)
-  }
-}
-
 def expectedPluginVersion = version.toString()
 def checkReadmeVersion = tasks.register('checkReadmeVersion') {
   group = 'verification'
@@ -95,56 +75,3 @@ def checkReadmeVersion = tasks.register('checkReadmeVersion') {
   }
 }
 tasks.named('check') { dependsOn(checkReadmeVersion) }
-
-publishing {
-  publications.withType(MavenPublication).configureEach { MavenPublication publication ->
-    pom {
-      name = publication.name == 'pluginMaven' ? 'Podval Gradle Conventions' : publication.name
-      description = project.description
-      url = gitHubRepositoryUrl
-      inceptionYear = '2026'
-      scm {
-        url = gitHubRepositoryUrl
-        connection = "scm:git:https://github.com/${gitHubRepository}.git"
-        developerConnection = "scm:git:ssh://git@github.com/${gitHubRepository}.git"
-      }
-      issueManagement {
-        system = 'GitHub'
-        url = "$gitHubRepositoryUrl/issues"
-      }
-      ciManagement {
-        system = 'GitHub Actions'
-        url = "$gitHubRepositoryUrl/actions"
-      }
-      licenses {
-        license {
-          name = 'Apache-2.0'
-          url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
-        }
-      }
-      organization {
-        name = orgName
-        url = orgUrl
-      }
-      developers {
-        developer {
-          id = 'dub'
-          name = 'Leonid Dubinsky'
-          email = 'dub@podval.org'
-          url = 'https://dub.podval.org'
-          organization = orgName
-          organizationUrl = orgUrl
-          timezone = '-5'
-        }
-      }
-    }
-  }
-}
-
-signing {
-  def key = providers.gradleProperty('signingKey')
-  def password = providers.gradleProperty('signingPassword')
-  required = key.isPresent()
-  useInMemoryPgpKeys(key.getOrNull(), password.getOrNull())
-  sign publishing.publications
-}

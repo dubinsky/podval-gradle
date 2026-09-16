@@ -40,14 +40,11 @@ id 'org.podval.conventions' version '0.1.0'
 id 'org.podval.conventions.publish' version '0.1.0'
 ----
 
-TODO: publish to Maven Central, then pin versions in consumers so CI works without
-`includeBuild`.
-
-TODO: after that, self-apply the published plugins here (settings + conventions +
-publish) so this build drops the duplicated Foojay/DRM, versions filter, toolchain,
-POM, and signing. Keep `nmcp` and `java-gradle-plugin` / `gradlePlugin { }`. Do not
-`includeBuild` this repo from itself; the pinned Central version is last release
-while the next one is developed.
+This repo pins that Central version on `org.podval.conventions.settings` and does
+not `includeBuild` itself (the pin is the last release while the next one is
+developed). `org.podval.conventions` and `org.podval.conventions.publish` apply
+from that same artifact already on the classpath — do not put a version on those
+two ids here. Keep `nmcp` and `java-gradle-plugin` / `gradlePlugin { }`.
 
 == Consumer shape
 
