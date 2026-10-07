@@ -47,8 +47,6 @@ This repo pins the last Central release on `org.podval.conventions.settings` and
 do not put a version on those two ids here.
 Keep `java-gradle-plugin` / `gradlePlugin { }`.
 Publishing builds set `podvalCentral=true`.
-This checkout still pins published `0.1.0` and applies `com.gradleup.nmcp.settings`, `maven-publish`, and `signing`,
-because that release does not honor `podvalCentral` or apply those plugins.
 
 == Consumer shape
 

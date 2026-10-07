@@ -6,12 +6,7 @@ pluginManagement {
 }
 
 plugins {
-  id 'org.podval.conventions.settings' version '0.1.0'
-  // Keep until the settings pin honors podvalCentral=true (nmcp 1.6.2, USER_MANAGED).
-  // This checkout runs published 0.1.0, which does not.
-  // Applies com.gradleup.nmcp to maven-publish projects and aggregation on the root.
-  // https://gradleup.com/nmcp/
-  id 'com.gradleup.nmcp.settings' version '1.6.2'
+  id 'org.podval.conventions.settings' version '0.2.0'
 }
 
 rootProject.name = 'org.podval.conventions'
@@ -24,13 +19,7 @@ dependencyResolutionManagement {
   }
 }
 
+// podvalCentral=true makes conventions.settings apply nmcp (USER_MANAGED).
 // ./gradlew nmcpZipAggregation — inspect the zip
-// ./gradlew publishAggregationToCentralPortal — upload (USER_MANAGED)
-// https://central.sonatype.com/publishing/deployments — release
-nmcpSettings {
-  centralPortal {
-    publishingType = 'USER_MANAGED'
-    username = providers.gradleProperty('mavenCentralUsername')
-    password = providers.gradleProperty('mavenCentralPassword')
-  }
-}
+// ./gradlew publishAggregationToCentralPortal — upload
+// ./gradlew nmcpPublishDeployment -PnmcpDeploymentId=… — release
