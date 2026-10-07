@@ -18,7 +18,7 @@ podvalPublish {
 }
 
 dependencies {
-  implementation 'io.github.ben-manes:gradle-versions-plugin:0.63.1'
+  implementation 'io.github.ben-manes:gradle-versions-plugin:0.65.0'
   implementation 'org.gradle.toolchains:foojay-resolver:1.0.0'
   testImplementation 'org.junit.jupiter:junit-jupiter:6.1.3'
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -30,13 +30,13 @@ gradlePlugin {
       id = 'org.podval.conventions.settings'
       implementationClass = 'org.podval.conventions.ConventionsSettingsPlugin'
       displayName = 'Podval settings conventions'
-      description = 'Foojay toolchain resolver and Maven Central for dependency resolution'
+      description = 'Foojay toolchain resolver, Maven Central, and dependencyUpdates filters'
     }
     conventions {
       id = 'org.podval.conventions'
       implementationClass = 'org.podval.conventions.ConventionsPlugin'
       displayName = 'Podval project conventions'
-      description = 'dependencyUpdates filters, Java 25 toolchain, Scala 3 compiler flags'
+      description = 'Java 25 toolchain and Scala 3 compiler flags'
     }
     publishConventions {
       id = 'org.podval.conventions.publish'

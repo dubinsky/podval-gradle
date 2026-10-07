@@ -1,0 +1,17 @@
+# Weekly run of the reusable dependency-updates workflow for this repository.
+# Monday 12:00 UTC = 08:00 America/New_York (EDT, UTC-4) / 07:00 EST (UTC-5).
+
+name: Dependency updates
+
+on:
+  schedule:
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  dependency-updates:
+    uses: ./.github/workflows/dependency-updates.yml

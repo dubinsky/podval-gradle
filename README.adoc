@@ -2,35 +2,35 @@
 :toc:
 :toclevels: 3
 
-Shared Gradle setup for Podval (and other) projects: toolchain, Scala 3 flags,
-`dependencyUpdates` filters, Maven Central publishing. Not the site-publisher plugin
-(that stays in `site-publisher`).
+Shared Gradle setup for Podval (and other) projects: toolchain, Scala 3 flags, `dependencyUpdates` filters, Maven
+Central publishing.
+Not the site-publisher plugin (that stays in `site-publisher`).
 
-Java binary plugins (`java-gradle-plugin`), same shape as
-`org.podval.tools.site-publisher`. Plugin ids:
+Java binary plugins (`java-gradle-plugin`), same shape as `org.podval.tools.site-publisher`.
+Plugin ids:
 
 `org.podval.conventions.settings` (`settings.gradle`)::
 Foojay toolchain resolver; `dependencyResolutionManagement { repositories { mavenCentral() } }`.
+Applies `io.github.ben-manes.versions.settings` and the shared `rejectVersionIf` (non-stable + padded numeric `0.017`)
+on the root `dependencyUpdates` task.
+Subprojects contribute partial results and do not get their own `dependencyUpdates` task.
 Does **not** apply `com.gradleup.nmcp.settings` (publishing builds keep that line).
 `org.podval.conventions` (`build.gradle`)::
-Applies `io.github.ben-manes.versions` and the shared `rejectVersionIf` (non-stable + padded numeric `0.017`).
 If `java` is present (covers `java-library` / `scala`): Java 25 toolchain.
-If `scala` is present: `-release:25`, `-new-syntax`, `-feature`, `-language:strictEquality`, `-source:future`,
-and `scala.scalaVersion` from the `scalaVersion` Gradle property when that property is set.
+If `scala` is present: `-release:25`, `-new-syntax`, `-feature`, `-language:strictEquality`, `-source:future`, and
+`scala.scalaVersion` from the `scalaVersion` Gradle property when that property is set.
 Does **not** skip `compileJava`.
 `org.podval.conventions.publish` (`build.gradle`; libraries and Gradle-plugin projects)::
-`javadocJar` from ScalaDoc **before** `withJavadocJar()`; `withSourcesJar()`;
-jar `duplicatesStrategy = EXCLUDE` and Implementation-* manifest;
-Maven publication POM (SCM, issues, CI, Apache-2.0, developer) and in-memory signing from
+`javadocJar` from ScalaDoc **before** `withJavadocJar()`; `withSourcesJar()`; jar `duplicatesStrategy = EXCLUDE` and
+Implementation-* manifest; Maven publication POM (SCM, issues, CI, Apache-2.0, developer) and in-memory signing from
 `signingKey` / `signingPassword`.
-Creates a `library` publication unless `java-gradle-plugin` is applied
-(`pluginMaven` + markers already cover the jar).
+Creates a `library` publication unless `java-gradle-plugin` is applied (`pluginMaven` + markers already cover the jar).
 Sets `gradlePlugin.website` / `vcsUrl` from `gitHubRepository`.
 
 `org.podval.conventions` does not apply `scala` or `java` — the consumer still does.
-Markup-only sites (`www.podval.org`, MathWorlds) can apply it without `scala` and still
-get versions + toolchain once they have a Java plugin, or skip it and only use
-site-publisher + settings.
+Markup-only sites (`www.podval.org`, MathWorlds) can apply it without `scala` and still get the toolchain once they have
+a Java plugin, or skip it and only use site-publisher + settings.
+Settings already registers `dependencyUpdates`.
 
 Maven coordinates (plugin markers on Central; not the Gradle Plugin Portal):
 
@@ -40,11 +40,11 @@ id 'org.podval.conventions' version '0.1.0'
 id 'org.podval.conventions.publish' version '0.1.0'
 ----
 
-This repo pins that Central version on `org.podval.conventions.settings` and does
-not `includeBuild` itself (the pin is the last release while the next one is
-developed). `org.podval.conventions` and `org.podval.conventions.publish` apply
-from that same artifact already on the classpath — do not put a version on those
-two ids here. Keep `nmcp` and `java-gradle-plugin` / `gradlePlugin { }`.
+This repo pins that Central version on `org.podval.conventions.settings` and does not `includeBuild` itself (the pin is
+the last release while the next one is developed).
+`org.podval.conventions` and `org.podval.conventions.publish` apply from that same artifact already on the classpath —
+do not put a version on those two ids here.
+Keep `nmcp` and `java-gradle-plugin` / `gradlePlugin { }`.
 
 == Consumer shape
 
@@ -75,13 +75,44 @@ plugins {
 }
 ----
 
-Consumers pin `org.podval.conventions.settings` `0.1.0` so CI works without a
-composite. `org.podval.conventions` and `org.podval.conventions.publish` apply from
-that same artifact already on the classpath. Local checkout substitutes, same as
-site-publisher.
+Consumers pin `org.podval.conventions.settings` `0.1.0` so CI works without a composite.
+`org.podval.conventions` and `org.podval.conventions.publish` apply from that same artifact already on the classpath.
+Local checkout substitutes, same as site-publisher.
 
-`pluginManagement { repositories { mavenCentral() } }` is already required for
-`org.podval.tools.site-publisher` if that plugin is also Central-only.
+`pluginManagement { repositories { mavenCentral() } }` is already required for `org.podval.tools.site-publisher` if that
+plugin is also Central-only.
+
+== Dependency update alerts
+
+`org.podval.conventions.settings` registers `dependencyUpdates`.
+`.github/workflows/dependency-updates.yml` runs that task and keeps one GitHub issue, titled "Dependency updates
+available", open while the report has a dependency update or a current-channel Gradle update.
+A clean report closes that issue.
+A Gradle release candidate alone does not open it.
+
+GitHub runs a reusable workflow only when another workflow calls it.
+Each repository that wants the alert adds a caller.
+Issues must be enabled there, and the caller must grant `contents: read` and `issues: write`.
+Pin `<ref>` to a commit or tag that contains this workflow.
+The `0.1.0` tag does not.
+
+----
+name: Dependency updates
+on:
+  schedule:
+    # Monday 12:00 UTC
+    - cron: "0 12 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  dependency-updates:
+    uses: dubinsky/podval-gradle/.github/workflows/dependency-updates.yml@<ref>
+----
+
+This repository calls that file from `.github/workflows/dependency-updates-check.yml` on the same schedule.
+The relative `uses` path does not need a tag.
 
 == Publish extension
 
@@ -106,29 +137,29 @@ podvalPublish {
 }
 ----
 
-OpenTorah uses this publish plugin with `orgName = 'Open Torah Project'` /
-`developerEmail = 'dub@opentorah.org'`. Do not special-case OpenTorah in the plugin
-code. A Gradle-plugin project (`java-gradle-plugin`) still owns `gradlePlugin {
-plugins { } }` (id, implementation class, tags).
+OpenTorah uses this publish plugin with `orgName = 'Open Torah Project'` / `developerEmail = 'dub@opentorah.org'`.
+Do not special-case OpenTorah in the plugin code.
+A Gradle-plugin project (`java-gradle-plugin`) still owns `gradlePlugin { plugins { } }` (id, implementation class,
+tags).
 
-nmcp (`com.gradleup.nmcp.settings`, `nmcpSettings { centralPortal { … } }`) stays in
-the library’s `settings.gradle`. It is already one block and is not used by sites.
+nmcp (`com.gradleup.nmcp.settings`, `nmcpSettings { centralPortal { … } }`) stays in the library’s `settings.gradle`.
+It is already one block and is not used by sites.
 
-Apply `scala` (when used) **before** `org.podval.conventions.publish` so `javadocJar`
-is registered from ScalaDoc before `withJavadocJar()` reuses it.
+Apply `scala` (when used) **before** `org.podval.conventions.publish` so `javadocJar` is registered from ScalaDoc before
+`withJavadocJar()` reuses it.
 
 == Local iteration: composite build, not mavenLocal
 
-Same rule as site-publisher README **Dogfooding**: `pluginManagement { includeBuild }`
-when the checkout exists; Maven Central when it does not. Do **not** use
-`publishToMavenLocal` / `mavenLocal()` to try changes.
+Same rule as site-publisher README **Dogfooding**: `pluginManagement { includeBuild }` when the checkout exists; Maven
+Central when it does not.
+Do **not** use `publishToMavenLocal` / `mavenLocal()` to try changes.
 
 == Why this repo, not `dub.podval.org`
 
-`dub.podval.org` is a published notes site (and a site-publisher consumer). Putting
-convention plugins there would mean `includeBuild('../dub.podval.org')` from `xml`,
-`pulumi`, OpenTorah, MathWorlds — a website composite for build logic.
+`dub.podval.org` is a published notes site (and a site-publisher consumer).
+Putting convention plugins there would mean `includeBuild('../dub.podval.org')` from `xml`, `pulumi`, OpenTorah,
+MathWorlds — a website composite for build logic.
 
-This repo is only Gradle conventions. Local path next to the other Podval Gradle
-projects so `includeBuild('../podval-gradle')` matches `../site-publisher` /
+This repo is only Gradle conventions.
+Local path next to the other Podval Gradle projects so `includeBuild('../podval-gradle')` matches `../site-publisher` /
 `../xml`.

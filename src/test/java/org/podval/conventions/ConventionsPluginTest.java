@@ -27,12 +27,42 @@ final class ConventionsPluginTest {
       }
       assert pluginManager.hasPlugin('org.gradle.toolchains.foojay-resolver-convention')
       assert pluginManager.hasPlugin('org.podval.conventions.settings')
+      assert pluginManager.hasPlugin('io.github.ben-manes.versions.settings')
       assert !pluginManager.hasPlugin('com.gradleup.nmcp.settings')
       assert dependencyResolutionManagement.repositories.size() > 0
       rootProject.name = 'settings-test'
       """
     );
     writeBuild("plugins { id 'org.podval.conventions' }\n");
+    BuildResult result = runner("help").build();
+    assertTrue(result.getOutput().contains("BUILD SUCCESSFUL"), result.getOutput());
+  }
+
+  @Test
+  void versionsReportIsRootOnly() throws IOException {
+    writeSettings(
+      """
+      plugins {
+        id 'org.podval.conventions.settings'
+      }
+      include 'lib'
+      rootProject.name = 'versions-layout'
+      """
+    );
+    writeBuild(
+      """
+      plugins {
+        id 'org.podval.conventions'
+      }
+      gradle.projectsEvaluated {
+        assert rootProject.tasks.names.contains('dependencyUpdates')
+        def lib = rootProject.project(':lib')
+        assert !lib.tasks.names.contains('dependencyUpdates')
+        assert lib.tasks.names.contains('partialDependencyUpdates')
+      }
+      """
+    );
+    Files.createDirectories(projectDir.resolve("lib"));
     BuildResult result = runner("help").build();
     assertTrue(result.getOutput().contains("BUILD SUCCESSFUL"), result.getOutput());
   }
