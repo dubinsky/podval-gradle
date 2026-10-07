@@ -1,5 +1,7 @@
 plugins {
   id 'java-gradle-plugin'
+  // Keep maven-publish and signing until the settings pin is a release whose
+  // org.podval.conventions.publish applies them. This checkout runs published 0.1.0.
   id 'maven-publish'
   id 'signing'
   // Same artifact as settings 0.1.0 already on the classpath; a version here fails
@@ -20,6 +22,7 @@ podvalPublish {
 dependencies {
   implementation 'io.github.ben-manes:gradle-versions-plugin:0.65.0'
   implementation 'org.gradle.toolchains:foojay-resolver:1.0.0'
+  implementation 'com.gradleup.nmcp:nmcp:1.6.2'
   testImplementation 'org.junit.jupiter:junit-jupiter:6.1.3'
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

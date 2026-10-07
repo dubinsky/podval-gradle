@@ -39,6 +39,77 @@ final class ConventionsPluginTest {
   }
 
   @Test
+  void centralPortalWhenPodvalCentralIsTrue() throws IOException {
+    Files.writeString(
+      projectDir.resolve("gradle.properties"),
+      """
+      podvalCentral=true
+      mavenCentralUsername=the-user
+      mavenCentralPassword=the-password
+      """,
+      StandardCharsets.UTF_8
+    );
+    writeSettings(
+      """
+      plugins {
+        id 'org.podval.conventions.settings'
+      }
+      def portal = [:]
+      nmcpSettings.centralPortal { options ->
+        portal.type = options.publishingType.get()
+        portal.username = options.username.get()
+        portal.password = options.password.get()
+      }
+      assert portal.type == 'USER_MANAGED'
+      assert portal.username == 'the-user'
+      assert portal.password == 'the-password'
+      rootProject.name = 'central-test'
+      """
+    );
+    writeBuild(
+      """
+      plugins {
+        id 'java-library'
+        id 'org.podval.conventions.publish'
+      }
+      podvalPublish {
+        gitHubRepository = 'dubinsky/xml'
+      }
+      assert pluginManager.hasPlugin('com.gradleup.nmcp.aggregation')
+      assert pluginManager.hasPlugin('com.gradleup.nmcp')
+      """
+    );
+    BuildResult result = runner(
+      "help",
+      "--configuration-cache",
+      "-PmavenCentralUsername=the-user",
+      "-PmavenCentralPassword=the-password"
+    ).build();
+    assertTrue(result.getOutput().contains("BUILD SUCCESSFUL"), result.getOutput());
+  }
+
+  @Test
+  void centralPortalStaysOffUnlessPropertyIsTrue() throws IOException {
+    Files.writeString(
+      projectDir.resolve("gradle.properties"),
+      "podvalCentral=false\n",
+      StandardCharsets.UTF_8
+    );
+    writeSettings(
+      """
+      plugins {
+        id 'org.podval.conventions.settings'
+      }
+      assert !pluginManager.hasPlugin('com.gradleup.nmcp.settings')
+      rootProject.name = 'central-off'
+      """
+    );
+    writeBuild("plugins { id 'org.podval.conventions' }\n");
+    BuildResult result = runner("help").build();
+    assertTrue(result.getOutput().contains("BUILD SUCCESSFUL"), result.getOutput());
+  }
+
+  @Test
   void versionsReportIsRootOnly() throws IOException {
     writeSettings(
       """
@@ -200,6 +271,31 @@ final class ConventionsPluginTest {
   }
 
   @Test
+  void publishAppliesMavenPublishAndSigning() throws IOException {
+    writeSettingsWithConventions();
+    writeBuild(
+      """
+      plugins {
+        id 'java-library'
+        id 'org.podval.conventions.publish'
+      }
+      podvalPublish {
+        gitHubRepository = 'dubinsky/xml'
+      }
+      tasks.register('assertPublishPlugins') {
+        doLast {
+          assert pluginManager.hasPlugin('maven-publish')
+          assert pluginManager.hasPlugin('signing')
+          assert publishing.publications.findByName('library') != null
+        }
+      }
+      """
+    );
+    BuildResult result = runner("assertPublishPlugins").build();
+    assertEquals(TaskOutcome.SUCCESS, result.task(":assertPublishPlugins").getOutcome());
+  }
+
+  @Test
   void publishRequiresGitHubRepository() throws IOException {
     writeSettingsWithConventions();
     writeBuild(
@@ -270,6 +366,45 @@ final class ConventionsPluginTest {
     );
     BuildResult result = runner("assertScalaVersion").build();
     assertEquals(TaskOutcome.SUCCESS, result.task(":assertScalaVersion").getOutcome());
+  }
+
+  @Test
+  void gradlePluginProjectCanDeclareItsOwnLibraryPublication() throws IOException {
+    writeSettingsWithConventions();
+    writeBuild(
+      """
+      plugins {
+        id 'org.podval.conventions.publish'
+        id 'java-gradle-plugin'
+      }
+      podvalPublish {
+        gitHubRepository = 'dubinsky/scalajs-gradle'
+      }
+      gradlePlugin {
+        plugins {
+          dummy {
+            id = 'conventions.test.dummy'
+            implementationClass = 'org.gradle.api.plugins.JavaLibraryPlugin'
+          }
+        }
+      }
+      publishing {
+        publications {
+          library(MavenPublication) {
+            from components.java
+          }
+        }
+      }
+      tasks.register('assertPublications') {
+        doLast {
+          assert publishing.publications.findByName('library') != null
+          assert publishing.publications.findByName('pluginMaven') != null
+        }
+      }
+      """
+    );
+    BuildResult result = runner("assertPublications").build();
+    assertEquals(TaskOutcome.SUCCESS, result.task(":assertPublications").getOutcome());
   }
 
   @Test

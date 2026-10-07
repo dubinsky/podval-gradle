@@ -20,8 +20,8 @@ import java.util.Map;
  * Publishing: ScalaDoc {@code javadocJar} before {@code withJavadocJar()}, sources
  * jar, jar duplicates/manifest, Maven publication POM, in-memory signing.
  * Creates a {@code library} publication unless {@code java-gradle-plugin} is applied
- * (that plugin already publishes {@code pluginMaven} plus markers). Does not apply
- * {@code java}, {@code scala}, {@code maven-publish}, or {@code signing}.
+ * (that plugin already publishes {@code pluginMaven} plus markers). Applies
+ * {@code maven-publish} and {@code signing}. Does not apply {@code java} or {@code scala}.
  */
 public final class ConventionsPublishPlugin implements Plugin<Project> {
   public static final String PLUGIN_ID = "org.podval.conventions.publish";
@@ -52,6 +52,12 @@ public final class ConventionsPublishPlugin implements Plugin<Project> {
     project.getPluginManager().withPlugin(JAVA_GRADLE_PLUGIN_ID, unused ->
       configureGradlePluginMetadata(project, extension)
     );
+
+    project.getPluginManager().apply("maven-publish");
+    project.getPluginManager().apply("signing");
+    // After the build script and any later plugins block. A project may declare `library`
+    // itself (Gradle-plugin builds do); creating it earlier attaches the Java component twice.
+    project.afterEvaluate(unused -> maybeCreateLibraryPublication(project));
   }
 
   private static void registerJavadocJarFromScalaDoc(Project project) {
@@ -85,7 +91,6 @@ public final class ConventionsPublishPlugin implements Plugin<Project> {
         ((Jar) task).getManifest().attributes(attributes);
       });
     });
-    maybeCreateLibraryPublication(project);
   }
 
   private static void configurePublishing(Project project, PublishExtension extension) {
@@ -93,7 +98,6 @@ public final class ConventionsPublishPlugin implements Plugin<Project> {
     publishing.getPublications().withType(MavenPublication.class).configureEach(publication ->
       configurePom(publication, extension, project)
     );
-    maybeCreateLibraryPublication(project);
   }
 
   private static void maybeCreateLibraryPublication(Project project) {

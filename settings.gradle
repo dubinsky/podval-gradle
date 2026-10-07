@@ -7,6 +7,8 @@ pluginManagement {
 
 plugins {
   id 'org.podval.conventions.settings' version '0.1.0'
+  // Keep until the settings pin honors podvalCentral=true (nmcp 1.6.2, USER_MANAGED).
+  // This checkout runs published 0.1.0, which does not.
   // Applies com.gradleup.nmcp to maven-publish projects and aggregation on the root.
   // https://gradleup.com/nmcp/
   id 'com.gradleup.nmcp.settings' version '1.6.2'

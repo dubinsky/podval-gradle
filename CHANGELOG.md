@@ -5,13 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.2.0] - 2026-10-07
+- `org.podval.conventions.publish` applies `maven-publish` and `signing`.
+- `org.podval.conventions.settings` applies `com.gradleup.nmcp.settings` 1.6.2 and the USER_MANAGED Central Portal block
+  when `podvalCentral=true`.
 - `org.podval.conventions.settings` applies `io.github.ben-manes.versions.settings` and the shared `rejectVersionIf`.
   The root project owns `dependencyUpdates`; other projects contribute partial results.
   `org.podval.conventions` no longer applies `io.github.ben-manes.versions`.
 - Reusable workflow `.github/workflows/dependency-updates.yml` runs `dependencyUpdates` and keeps one GitHub issue,
   "Dependency updates available", open while a dependency update or a current-channel Gradle update exists.
   This repository calls it weekly from `dependency-updates-check.yml`.
-- Consumers pin `org.podval.conventions.settings` `0.1.0` so CI works without `includeBuild`.
+- Consumers pin `org.podval.conventions.settings` `0.2.0` so CI works without `includeBuild`.
 - Self-apply published `0.1.0` (pin on settings; conventions + publish from the same artifact); drop duplicated
   Foojay/DRM, versions filter, toolchain, POM, and signing.
 

@@ -14,13 +14,15 @@ Foojay toolchain resolver; `dependencyResolutionManagement { repositories { mave
 Applies `io.github.ben-manes.versions.settings` and the shared `rejectVersionIf` (non-stable + padded numeric `0.017`)
 on the root `dependencyUpdates` task.
 Subprojects contribute partial results and do not get their own `dependencyUpdates` task.
-Does **not** apply `com.gradleup.nmcp.settings` (publishing builds keep that line).
+When `gradle.properties` contains `podvalCentral=true`, applies `com.gradleup.nmcp.settings` 1.6.2 and configures
+Central Portal `USER_MANAGED` from `mavenCentralUsername` and `mavenCentralPassword`.
 `org.podval.conventions` (`build.gradle`)::
 If `java` is present (covers `java-library` / `scala`): Java 25 toolchain.
 If `scala` is present: `-release:25`, `-new-syntax`, `-feature`, `-language:strictEquality`, `-source:future`, and
 `scala.scalaVersion` from the `scalaVersion` Gradle property when that property is set.
 Does **not** skip `compileJava`.
 `org.podval.conventions.publish` (`build.gradle`; libraries and Gradle-plugin projects)::
+Applies `maven-publish` and `signing`.
 `javadocJar` from ScalaDoc **before** `withJavadocJar()`; `withSourcesJar()`; jar `duplicatesStrategy = EXCLUDE` and
 Implementation-* manifest; Maven publication POM (SCM, issues, CI, Apache-2.0, developer) and in-memory signing from
 `signingKey` / `signingPassword`.
@@ -35,16 +37,18 @@ Settings already registers `dependencyUpdates`.
 Maven coordinates (plugin markers on Central; not the Gradle Plugin Portal):
 
 ----
-id 'org.podval.conventions.settings' version '0.1.0'
-id 'org.podval.conventions' version '0.1.0'
-id 'org.podval.conventions.publish' version '0.1.0'
+id 'org.podval.conventions.settings' version '0.2.0'
+id 'org.podval.conventions' version '0.2.0'
+id 'org.podval.conventions.publish' version '0.2.0'
 ----
 
-This repo pins that Central version on `org.podval.conventions.settings` and does not `includeBuild` itself (the pin is
-the last release while the next one is developed).
+This repo pins the last Central release on `org.podval.conventions.settings` and does not `includeBuild` itself.
 `org.podval.conventions` and `org.podval.conventions.publish` apply from that same artifact already on the classpath —
 do not put a version on those two ids here.
-Keep `nmcp` and `java-gradle-plugin` / `gradlePlugin { }`.
+Keep `java-gradle-plugin` / `gradlePlugin { }`.
+Publishing builds set `podvalCentral=true`.
+This checkout still pins published `0.1.0` and applies `com.gradleup.nmcp.settings`, `maven-publish`, and `signing`,
+because that release does not honor `podvalCentral` or apply those plugins.
 
 == Consumer shape
 
@@ -64,7 +68,7 @@ pluginManagement {
   }
 }
 plugins {
-  id 'org.podval.conventions.settings' version '0.1.0'
+  id 'org.podval.conventions.settings' version '0.2.0'
 }
 
 // build.gradle
@@ -75,7 +79,7 @@ plugins {
 }
 ----
 
-Consumers pin `org.podval.conventions.settings` `0.1.0` so CI works without a composite.
+Consumers pin `org.podval.conventions.settings` `0.2.0` so CI works without a composite.
 `org.podval.conventions` and `org.podval.conventions.publish` apply from that same artifact already on the classpath.
 Local checkout substitutes, same as site-publisher.
 
@@ -122,8 +126,6 @@ POM fields that differ per repo are an extension, not hard-coded Podval:
 plugins {
   id 'java-library'
   id 'scala'
-  id 'maven-publish'
-  id 'signing'
   id 'org.podval.conventions'
   id 'org.podval.conventions.publish'
 }
@@ -142,8 +144,9 @@ Do not special-case OpenTorah in the plugin code.
 A Gradle-plugin project (`java-gradle-plugin`) still owns `gradlePlugin { plugins { } }` (id, implementation class,
 tags).
 
-nmcp (`com.gradleup.nmcp.settings`, `nmcpSettings { centralPortal { … } }`) stays in the library’s `settings.gradle`.
-It is already one block and is not used by sites.
+Central publishing is `podvalCentral=true` in `gradle.properties`.
+The settings plugin then applies nmcp 1.6.2 with `publishingType = USER_MANAGED`.
+Sites leave the property unset.
 
 Apply `scala` (when used) **before** `org.podval.conventions.publish` so `javadocJar` is registered from ScalaDoc before
 `withJavadocJar()` reuses it.
