@@ -17,16 +17,22 @@ Subprojects contribute partial results and do not get their own `dependencyUpdat
 When `gradle.properties` contains `podvalCentral=true`, applies `com.gradleup.nmcp.settings` 1.6.2 and configures
 Central Portal `USER_MANAGED` from `mavenCentralUsername` and `mavenCentralPassword`.
 `org.podval.conventions` (`build.gradle`)::
-If `java` is present (covers `java-library` / `scala`): Java 25 toolchain.
-If `scala` is present: `-release:25`, `-new-syntax`, `-feature`, `-language:strictEquality`, `-source:future`, and
-`scala.scalaVersion` from the `scalaVersion` Gradle property when that property is set.
+Creates the `podval` extension.
+If `java` is present (covers `java-library` / `scala`): the Java toolchain `languageVersion` is conventioned to
+`podval.jvmLanguageVersion` (default 25).
+If `scala` is present: compiler parameters from `podval.scalaCompilerParameters` (`-release:25`, `-new-syntax`,
+`-feature`, `-language:strictEquality`, `-source:future`), `scala.scalaVersion` from the `scalaVersion` Gradle property
+when that property is set, and `scala.zincVersion` conventioned to `1.12.1`.
 Does **not** skip `compileJava`.
+Does **not** call `allowJdk25RestrictedAccess()`.
 `org.podval.conventions.publish` (`build.gradle`; libraries and Gradle-plugin projects)::
 Applies `maven-publish` and `signing`.
 `javadocJar` from ScalaDoc **before** `withJavadocJar()`; `withSourcesJar()`; jar `duplicatesStrategy = EXCLUDE` and
 Implementation-* manifest; Maven publication POM (SCM, issues, CI, Apache-2.0, developer) and in-memory signing from
 `signingKey` / `signingPassword`.
-Creates a `library` publication unless `java-gradle-plugin` is applied (`pluginMaven` + markers already cover the jar).
+Creates a `library` publication for Java libraries.
+Does not create `library` for Gradle plugin projects (`pluginMaven` and marker publications are those coordinates).
+Apply `java-gradle-plugin` or `com.gradle.plugin-publish` before this plugin.
 Sets `gradlePlugin.website` / `vcsUrl` from `gitHubRepository`.
 
 `org.podval.conventions` does not apply `scala` or `java` — the consumer still does.
@@ -80,6 +86,10 @@ plugins {
 Consumers pin `org.podval.conventions.settings` `0.2.0` so CI works without a composite.
 `org.podval.conventions` and `org.podval.conventions.publish` apply from that same artifact already on the classpath.
 Local checkout substitutes, same as site-publisher.
+Keep the `includeBuild` path a `String`.
+Do not replace that snippet with an init script.
+`gradlePluginPortal()` stays in `pluginManagement`, because Foojay 1.0.0 and `gradle-versions-plugin` 0.66.0 are not on
+Maven Central.
 
 `pluginManagement { repositories { mavenCentral() } }` is already required for `org.podval.tools.site-publisher` if that
 plugin is also Central-only.
@@ -116,6 +126,47 @@ jobs:
 This repository calls that file from `.github/workflows/dependency-updates-check.yml` on the same schedule.
 The relative `uses` path does not need a tag.
 
+== `podval` extension
+
+`org.podval.conventions` creates `podval`.
+Read the JVM language version, add or remove Scala compiler parameters, or opt in to the JDK 25 helper:
+
+----
+plugins {
+  id 'java-library'
+  id 'scala'
+  id 'org.podval.conventions'
+}
+
+// The extension value. A direct java.toolchain.languageVersion.set is separate.
+podval.jvmLanguageVersion.get()
+
+podval {
+  jvmLanguageVersion.set(JavaLanguageVersion.of(21))
+  scalaCompilerParameters.add('-Xfatal-warnings')
+  scalaCompilerParameters.remove('-source:future')
+  allowJdk25RestrictedAccess()
+}
+----
+
+`scalaCompilerParameters` starts as `-release:25`, `-new-syntax`, `-feature`, `-language:strictEquality`, and
+`-source:future`.
+Changing `jvmLanguageVersion` does not rewrite that list.
+Edit the list in the build script.
+`allowJdk25RestrictedAccess()` adds `--enable-native-access=ALL-UNNAMED` and `--sun-misc-unsafe-memory-access=allow` to
+this project's `JavaExec` and `Test` tasks.
+Calling it again does not duplicate an argument that is already present.
+The plugin does not call it.
+
+When `scala` is applied, `scala.zincVersion` is conventioned to `1.12.1` (Gradle 9.8.x conventions `1.12.0`).
+A build-script assignment still wins, whether it runs before or after this plugin.
+Delete local `scala.zincVersion` pins after upgrading to this version.
+`scala.scalaVersion` still comes from the `scalaVersion` Gradle property when that property is set.
+There is no default Scala version.
+
+The Java toolchain `languageVersion` is conventioned to `podval.jvmLanguageVersion` (default 25).
+A prior or later `java.toolchain.languageVersion.set` wins for compilation and does not write back into the extension.
+
 == Publish extension
 
 POM fields that differ per repo are an extension, not hard-coded Podval:
@@ -148,6 +199,9 @@ Sites leave the property unset.
 
 Apply `scala` (when used) **before** `org.podval.conventions.publish` so `javadocJar` is registered from ScalaDoc before
 `withJavadocJar()` reuses it.
+Apply `java-gradle-plugin` or `com.gradle.plugin-publish` **before** `org.podval.conventions.publish`.
+`library` is created for Java libraries and is not created for Gradle plugin projects.
+`pluginMaven` and marker publications are the plugin coordinates.
 
 == Local iteration: composite build, not mavenLocal
 

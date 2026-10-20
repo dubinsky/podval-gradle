@@ -19,9 +19,9 @@ import java.util.Map;
 /**
  * Publishing: ScalaDoc {@code javadocJar} before {@code withJavadocJar()}, sources
  * jar, jar duplicates/manifest, Maven publication POM, in-memory signing.
- * Creates a {@code library} publication unless {@code java-gradle-plugin} is applied
- * (that plugin already publishes {@code pluginMaven} plus markers). Applies
- * {@code maven-publish} and {@code signing}. Does not apply {@code java} or {@code scala}.
+ * Creates a {@code library} publication when {@code java} is present and
+ * {@code java-gradle-plugin} is not. Applying {@code java-gradle-plugin} afterward fails.
+ * Applies {@code maven-publish} and {@code signing}. Does not apply {@code java} or {@code scala}.
  */
 public final class ConventionsPublishPlugin implements Plugin<Project> {
   public static final String PLUGIN_ID = "org.podval.conventions.publish";
@@ -31,6 +31,8 @@ public final class ConventionsPublishPlugin implements Plugin<Project> {
   public static final String DEFAULT_ORG_NAME = "Podval Group";
   public static final String DEFAULT_ORG_URL = "https://www.podval.org";
   public static final String DEFAULT_DEVELOPER_EMAIL = "dub@podval.org";
+
+  private boolean createdLibrary;
 
   @Override
   public void apply(Project project) {
@@ -49,15 +51,15 @@ public final class ConventionsPublishPlugin implements Plugin<Project> {
     project.getPluginManager().withPlugin("java", unused -> configureJava(project, extension));
     project.getPluginManager().withPlugin("maven-publish", unused -> configurePublishing(project, extension));
     project.getPluginManager().withPlugin("signing", unused -> configureSigning(project));
-    project.getPluginManager().withPlugin(JAVA_GRADLE_PLUGIN_ID, unused ->
-      configureGradlePluginMetadata(project, extension)
-    );
 
     project.getPluginManager().apply("maven-publish");
     project.getPluginManager().apply("signing");
-    // After the build script and any later plugins block. A project may declare `library`
-    // itself (Gradle-plugin builds do); creating it earlier attaches the Java component twice.
-    project.afterEvaluate(unused -> maybeCreateLibraryPublication(project));
+
+    project.getPluginManager().withPlugin("java", unused -> maybeCreateLibraryPublication(project));
+    project.getPluginManager().withPlugin(JAVA_GRADLE_PLUGIN_ID, unused -> {
+      configureGradlePluginMetadata(project, extension);
+      rejectLateGradlePlugin(project);
+    });
   }
 
   private static void registerJavadocJarFromScalaDoc(Project project) {
@@ -100,27 +102,30 @@ public final class ConventionsPublishPlugin implements Plugin<Project> {
     );
   }
 
-  private static void maybeCreateLibraryPublication(Project project) {
+  private void maybeCreateLibraryPublication(Project project) {
     if (project.getPluginManager().hasPlugin(JAVA_GRADLE_PLUGIN_ID)) {
-      return;
-    }
-    if (!project.getPluginManager().hasPlugin("java")) {
-      return;
-    }
-    if (!project.getPluginManager().hasPlugin("maven-publish")) {
       return;
     }
     PublishingExtension publishing = project.getExtensions().getByType(PublishingExtension.class);
     if (publishing.getPublications().findByName(LIBRARY_PUBLICATION) != null) {
       return;
     }
-    SoftwareComponent java = project.getComponents().findByName("java");
-    if (java == null) {
+    SoftwareComponent component = project.getComponents().findByName("java");
+    if (component == null) {
       return;
     }
     publishing.getPublications().create(LIBRARY_PUBLICATION, MavenPublication.class, publication ->
-      publication.from(java)
+      publication.from(component)
     );
+    createdLibrary = true;
+  }
+
+  private void rejectLateGradlePlugin(Project project) {
+    if (createdLibrary) {
+      throw new GradleException(
+        "Apply java-gradle-plugin or com.gradle.plugin-publish before org.podval.conventions.publish"
+      );
+    }
   }
 
   private static void configurePom(
