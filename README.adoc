@@ -43,9 +43,9 @@ Settings already registers `dependencyUpdates`.
 Maven coordinates (plugin markers on Central; not the Gradle Plugin Portal):
 
 ----
-id 'org.podval.conventions.settings' version '0.2.0'
-id 'org.podval.conventions' version '0.2.0'
-id 'org.podval.conventions.publish' version '0.2.0'
+id 'org.podval.conventions.settings' version '0.3.0'
+id 'org.podval.conventions' version '0.3.0'
+id 'org.podval.conventions.publish' version '0.3.0'
 ----
 
 This repo pins the last Central release on `org.podval.conventions.settings` and does not `includeBuild` itself.
@@ -72,7 +72,7 @@ pluginManagement {
   }
 }
 plugins {
-  id 'org.podval.conventions.settings' version '0.2.0'
+  id 'org.podval.conventions.settings' version '0.3.0'
 }
 
 // build.gradle
@@ -83,7 +83,7 @@ plugins {
 }
 ----
 
-Consumers pin `org.podval.conventions.settings` `0.2.0` so CI works without a composite.
+Consumers pin `org.podval.conventions.settings` `0.3.0` so CI works without a composite.
 `org.podval.conventions` and `org.podval.conventions.publish` apply from that same artifact already on the classpath.
 Local checkout substitutes, same as site-publisher.
 Keep the `includeBuild` path a `String`.

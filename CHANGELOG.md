@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.3.0] - 2026-10-20
 - Self-apply published `0.2.0` and drop the explicit `com.gradleup.nmcp.settings`, `maven-publish`, and `signing` lines.
 - `io.github.ben-manes:gradle-versions-plugin` 0.66.0 and the Gradle wrapper 9.8.2.
 - `podval` extension: read `jvmLanguageVersion`, and add or remove `scalaCompilerParameters`.
