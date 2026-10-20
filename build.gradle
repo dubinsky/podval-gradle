@@ -16,7 +16,7 @@ podvalPublish {
 }
 
 dependencies {
-  implementation 'io.github.ben-manes:gradle-versions-plugin:0.65.0'
+  implementation 'io.github.ben-manes:gradle-versions-plugin:0.66.0'
   implementation 'org.gradle.toolchains:foojay-resolver:1.0.0'
   implementation 'com.gradleup.nmcp:nmcp:1.6.2'
   testImplementation 'org.junit.jupiter:junit-jupiter:6.1.3'
