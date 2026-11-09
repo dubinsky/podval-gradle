@@ -33,6 +33,8 @@ public abstract class ConventionsExtension {
 
   public abstract Property<Integer> getJavaOutputVersion();
 
+  public abstract Property<Boolean> getCompileJavaEnabled();
+
   public List<String> getScalaCompilerParameters() {
     return scalaCompilerParameters;
   }

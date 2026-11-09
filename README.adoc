@@ -30,7 +30,8 @@ If `scala` is present: compiler parameters from `podval.scalaCompilerParameters`
 `-language:strictEquality`, `-source:future`) and `-java-output-version:N` from `podval.javaOutputVersion`,
 `scala.scalaVersion` from the `scalaVersion` Gradle property when that property is set, and `scala.zincVersion`
 conventioned to `1.12.1`.
-Does **not** skip `compileJava`.
+`compileJava` stays enabled by default, and `podval.compileJavaEnabled = false` disables that project's `compileJava`
+only (not `compileTestJava`, not the whole build's excluded-task list).
 Does **not** call `allowJdk25RestrictedAccess()`.
 `org.podval.conventions.publish` (`build.gradle`; libraries and Gradle-plugin projects)::
 Applies `maven-publish` and `signing`.

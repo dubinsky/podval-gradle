@@ -3,8 +3,10 @@ package org.podval.conventions;
 import org.gradle.api.GradleException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
+import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.plugins.JavaPluginExtension;
 import org.gradle.api.plugins.scala.ScalaPluginExtension;
+import org.gradle.api.tasks.compile.JavaCompile;
 import org.gradle.api.tasks.scala.ScalaCompile;
 import org.gradle.jvm.toolchain.JavaLanguageVersion;
 import java.util.ArrayList;
@@ -14,7 +16,8 @@ import java.util.List;
  * {@code podval} extension, Java toolchain convention when {@code java} is present
  * (covers {@code java-library} and {@code scala}), and Scala flags when {@code scala}
  * is present. Does not apply {@code java} or {@code scala}. Does not skip
- * {@code compileJava}. Does not call {@code allowJdk25RestrictedAccess}.
+ * {@code compileJava} by default; {@code compileJavaEnabled = false} disables that
+ * project's {@code compileJava} only. Does not call {@code allowJdk25RestrictedAccess}.
  * {@code dependencyUpdates} comes from {@code org.podval.conventions.settings}.
  */
 public final class ConventionsPlugin implements Plugin<Project> {
@@ -29,10 +32,19 @@ public final class ConventionsPlugin implements Plugin<Project> {
     podval.getJavaOutputVersion().convention(
       podval.getJvmLanguageVersion().map(JavaLanguageVersion::asInt)
     );
+    podval.getCompileJavaEnabled().convention(true);
 
     project.getPluginManager().withPlugin("java", unused -> {
       JavaPluginExtension java = project.getExtensions().getByType(JavaPluginExtension.class);
       java.getToolchain().getLanguageVersion().convention(podval.getJvmLanguageVersion());
+      project.getTasks().withType(JavaCompile.class).configureEach(task -> {
+        if (!JavaPlugin.COMPILE_JAVA_TASK_NAME.equals(task.getName())) {
+          return;
+        }
+        if (!podval.getCompileJavaEnabled().get()) {
+          task.setEnabled(false);
+        }
+      });
     });
 
     project.getPluginManager().withPlugin("scala", unused -> {

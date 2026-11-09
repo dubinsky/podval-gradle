@@ -168,6 +168,48 @@ final class ConventionsPluginTest {
   }
 
   @Test
+  void compileJavaOptInIsPerProject() throws IOException {
+    writeSettings(
+      """
+      plugins {
+        id 'org.podval.conventions.settings'
+      }
+      include 'lib'
+      rootProject.name = 'compile-java-opt-in'
+      """
+    );
+    writeBuild(
+      """
+      plugins {
+        id 'java-library'
+        id 'org.podval.conventions'
+      }
+      gradle.projectsEvaluated {
+        assert rootProject.tasks.named('compileJava').get().enabled
+        assert !gradle.startParameter.excludedTaskNames.contains('compileJava')
+        def lib = rootProject.project(':lib')
+        assert !lib.tasks.named('compileJava').get().enabled
+        assert lib.tasks.named('compileTestJava').get().enabled
+      }
+      """
+    );
+    Files.createDirectories(projectDir.resolve("lib"));
+    Files.writeString(
+      projectDir.resolve("lib/build.gradle"),
+      """
+      plugins {
+        id 'java-library'
+        id 'org.podval.conventions'
+      }
+      podval.compileJavaEnabled = false
+      """,
+      StandardCharsets.UTF_8
+    );
+    BuildResult result = runner("help").build();
+    assertTrue(result.getOutput().contains("BUILD SUCCESSFUL"), result.getOutput());
+  }
+
+  @Test
   void scalaFlagsWhenScalaPresent() throws IOException {
     writeSettingsWithConventions();
     writeBuild(

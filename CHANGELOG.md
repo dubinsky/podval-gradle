@@ -14,6 +14,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Stable keywords `RELEASE`, `FINAL`, and `GA` match a whole `.` or `-` component, so `1.0.0-legacy` is rejected.
   `podvalSettings.acceptVersionIf` keeps a non-stable version any hook accepts.
   The hook does not override a padded component such as `0.017` and does not change `available.preRelease`.
+- `podval.compileJavaEnabled` defaults to true.
+  Setting it to `false` disables that project's `compileJava` only, not `compileTestJava` and not the build's
+  excluded-task list.
 
 ## [0.3.0] - 2026-10-20
 - Self-apply published `0.2.0` and drop the explicit `com.gradleup.nmcp.settings`, `maven-publish`, and `signing` lines.
