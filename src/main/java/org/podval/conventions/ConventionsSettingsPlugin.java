@@ -8,6 +8,7 @@ import org.gradle.api.initialization.Settings;
 /**
  * Foojay toolchain resolver, Maven Central for dependency resolution, and the
  * versions settings plugin with the shared {@code rejectVersionIf}.
+ * {@code podvalSettings.acceptVersionIf} may keep a non-stable version.
  * When {@code podvalCentral=true}, applies {@code com.gradleup.nmcp.settings} and
  * the USER_MANAGED Central Portal block.
  */
@@ -26,12 +27,20 @@ public final class ConventionsSettingsPlugin implements Plugin<Settings> {
     settings.getPluginManager().apply(FOOJAY_PLUGIN_ID);
     settings.getPluginManager().apply(VERSIONS_SETTINGS_PLUGIN_ID);
     settings.getDependencyResolutionManagement().getRepositories().mavenCentral();
+    ConventionsSettingsExtension extension = settings.getExtensions().create(
+      ConventionsSettingsExtension.NAME,
+      ConventionsSettingsExtension.class
+    );
     // The settings plugin registers dependencyUpdates on the root project only.
     // Producers in other projects inherit this filter from that task.
+    // Read the extension at selection time: the settings body adds hooks after apply returns.
     settings.getGradle().rootProject(project ->
       project.getTasks().withType(DependencyUpdatesTask.class).configureEach(task ->
         task.rejectVersionIf(selection ->
-          VersionFilters.reject(selection.getCandidate().getVersion())
+          VersionFilters.reject(
+            selection.getCandidate().getVersion(),
+            extension::accepted
+          )
         )
       )
     );

@@ -13,7 +13,13 @@ Plugin ids:
 Foojay toolchain resolver; `dependencyResolutionManagement { repositories { mavenCentral() } }`.
 Applies `io.github.ben-manes.versions.settings` and the shared `rejectVersionIf` (non-stable + padded numeric `0.017`)
 on the root `dependencyUpdates` task.
+Stable keywords are whole `.` / `-` components (`RELEASE`, `FINAL`, `GA`), not substrings, so `1.0.0-legacy` is
+rejected.
 Subprojects contribute partial results and do not get their own `dependencyUpdates` task.
+In the settings body after `plugins`, not inside `pluginManagement`, `podvalSettings { acceptVersionIf { ... } }` keeps
+a non-stable version when any hook accepts it.
+The hook does not override a padded component such as `0.017`, and it does not change the versions plugin's built-in
+pre-release step (`available.preRelease`).
 When `gradle.properties` contains `podvalCentral=true`, applies `com.gradleup.nmcp.settings` 1.6.2 and configures
 Central Portal `USER_MANAGED` from `mavenCentralUsername` and `mavenCentralPassword`.
 `org.podval.conventions` (`build.gradle`)::
@@ -77,6 +83,9 @@ pluginManagement {
 }
 plugins {
   id 'org.podval.conventions.settings' version '0.3.0'
+}
+podvalSettings {
+  acceptVersionIf { it.contains('-jre') }
 }
 
 // build.gradle

@@ -36,4 +36,23 @@ final class VersionFiltersTest {
     assertFalse(VersionFilters.hasPaddedNumericComponent("0.0.17"));
     assertTrue(VersionFilters.hasPaddedNumericComponent("1.2.03"));
   }
+
+  @Test
+  void rejectsKeywordSubstring() {
+    assertTrue(VersionFilters.isNonStable("1.0.0-legacy"));
+    assertTrue(VersionFilters.reject("1.0.0-legacy"));
+    assertTrue(VersionFilters.isNonStable("1.0.0-GA1"));
+    assertTrue(VersionFilters.reject("1.0.0-GA1"));
+    assertTrue(VersionFilters.reject("9.0.0-core.0.5"));
+    assertTrue(VersionFilters.reject("6.20.0-core.0.5"));
+  }
+
+  @Test
+  void acceptHookKeepsNonStableVersionOnly() {
+    assertFalse(VersionFilters.reject("9.0.0-core.0.5", version -> version.contains("-core.")));
+    assertTrue(VersionFilters.reject("1.0.0-legacy", version -> version.contains("-core.")));
+    assertTrue(VersionFilters.reject("0.017", version -> version.contains("-core.")));
+    assertTrue(VersionFilters.reject("0.017", version -> true));
+    assertFalse(VersionFilters.reject("1.0.0-RC1", version -> true));
+  }
 }

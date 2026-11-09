@@ -1,5 +1,6 @@
 package org.podval.conventions;
 
+import groovy.json.JsonSlurper;
 import org.gradle.testkit.runner.BuildResult;
 import org.gradle.testkit.runner.GradleRunner;
 import org.gradle.testkit.runner.TaskOutcome;
@@ -9,10 +10,13 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.jar.JarFile;
+import java.util.jar.JarOutputStream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class ConventionsPluginTest {
@@ -983,6 +987,179 @@ final class ConventionsPluginTest {
     runner("help", "--configuration-cache").build();
     BuildResult second = runner("help", "--configuration-cache").build();
     assertTrue(second.getOutput().contains("Reusing configuration cache."), second.getOutput());
+  }
+
+  @Test
+  void acceptHookOnSubprojectReport() throws IOException {
+    writeFakeWidgetRepo();
+    Files.createDirectories(projectDir.resolve("lib"));
+    writeBuild("");
+    Files.writeString(
+      projectDir.resolve("lib/build.gradle"),
+      """
+      plugins {
+        id 'java-library'
+      }
+      dependencies {
+        implementation 'com.example.fake:widget:9.0.0-core.0.4'
+      }
+      """,
+      StandardCharsets.UTF_8
+    );
+    writeAcceptHookSettings(true);
+    BuildResult withHook = dependencyUpdates();
+    assertTrue(withHook.getOutput().contains("BUILD SUCCESSFUL"), withHook.getOutput());
+    Path report = projectDir.resolve("build/dependencyUpdates/report.json");
+    assertTrue(Files.isRegularFile(report), withHook.getOutput());
+    assertEquals(
+      "9.0.0-core.0.5",
+      availableRelease(report, "com.example.fake", "widget"),
+      Files.readString(report)
+    );
+
+    runner("help", "--configuration-cache").build();
+    BuildResult cached = runner("help", "--configuration-cache").build();
+    assertTrue(cached.getOutput().contains("Reusing configuration cache."), cached.getOutput());
+
+    writeAcceptHookSettings(false);
+    BuildResult withoutHook = dependencyUpdates();
+    assertTrue(withoutHook.getOutput().contains("BUILD SUCCESSFUL"), withoutHook.getOutput());
+    assertNull(
+      availableRelease(report, "com.example.fake", "widget"),
+      Files.readString(report)
+    );
+  }
+
+  @Test
+  void acceptVersionIfAnySpecKeepsTheVersion() {
+    ConventionsSettingsExtension extension = new ConventionsSettingsExtension();
+    assertFalse(extension.accepted("1.0.0-RC1"));
+    extension.acceptVersionIf(version -> version.contains("-core."));
+    extension.acceptVersionIf(version -> version.contains("RC"));
+    assertTrue(extension.accepted("9.0.0-core.0.5"));
+    assertTrue(extension.accepted("1.0.0-RC1"));
+    assertFalse(extension.accepted("1.0.0-legacy"));
+  }
+
+  private void writeFakeWidgetRepo() throws IOException {
+    Path module = projectDir.resolve("repo/com/example/fake/widget");
+    for (String version : new String[] {"9.0.0-core.0.4", "9.0.0-core.0.5"}) {
+      Path versionDir = module.resolve(version);
+      Files.createDirectories(versionDir);
+      Files.writeString(
+        versionDir.resolve("widget-" + version + ".pom"),
+        """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <project>
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>com.example.fake</groupId>
+          <artifactId>widget</artifactId>
+          <version>%s</version>
+        </project>
+        """.formatted(version),
+        StandardCharsets.UTF_8
+      );
+      try (JarOutputStream ignored = new JarOutputStream(
+        Files.newOutputStream(versionDir.resolve("widget-" + version + ".jar"))
+      )) {
+        // Manifest only. The versions plugin resolves the jar.
+      }
+    }
+    Files.writeString(
+      module.resolve("maven-metadata.xml"),
+      """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <metadata>
+        <groupId>com.example.fake</groupId>
+        <artifactId>widget</artifactId>
+        <versioning>
+          <latest>9.0.0-core.0.5</latest>
+          <release>9.0.0-core.0.5</release>
+          <versions>
+            <version>9.0.0-core.0.4</version>
+            <version>9.0.0-core.0.5</version>
+          </versions>
+          <lastUpdated>20261109000000</lastUpdated>
+        </versioning>
+      </metadata>
+      """,
+      StandardCharsets.UTF_8
+    );
+  }
+
+  private void writeAcceptHookSettings(boolean acceptCore) throws IOException {
+    String hook = acceptCore
+      ? """
+        podvalSettings {
+          acceptVersionIf { it.contains('-core.') }
+        }
+        """
+      : "";
+    writeSettings(
+      """
+      plugins {
+        id 'org.podval.conventions.settings'
+      }
+      """
+      + hook
+      + """
+      def widgetRepo = uri('repo')
+      dependencyResolutionManagement {
+        repositories {
+          exclusiveContent {
+            forRepository {
+              maven { url = widgetRepo }
+            }
+            filter {
+              includeModule('com.example.fake', 'widget')
+            }
+          }
+        }
+      }
+      include 'lib'
+      rootProject.name = 'accept-hook'
+      """
+    );
+  }
+
+  private BuildResult dependencyUpdates() {
+    // Default revision is milestone, which leaves available.release null.
+    return runner(
+      "dependencyUpdates",
+      "--output-formatter=json",
+      "--revision=release",
+      "--no-check-for-gradle-update"
+    ).build();
+  }
+
+  private static String availableRelease(Path reportFile, String group, String name) {
+    Object parsed = new JsonSlurper().parse(reportFile.toFile());
+    if (!(parsed instanceof Map<?, ?> report)) {
+      return null;
+    }
+    Object outdated = report.get("outdated");
+    if (!(outdated instanceof Map<?, ?> outdatedGroup)) {
+      return null;
+    }
+    Object dependencies = outdatedGroup.get("dependencies");
+    if (!(dependencies instanceof Iterable<?> rows)) {
+      return null;
+    }
+    for (Object row : rows) {
+      if (!(row instanceof Map<?, ?> dependency)) {
+        continue;
+      }
+      if (!group.equals(dependency.get("group")) || !name.equals(dependency.get("name"))) {
+        continue;
+      }
+      Object available = dependency.get("available");
+      if (!(available instanceof Map<?, ?> versions)) {
+        return null;
+      }
+      Object release = versions.get("release");
+      return release == null ? null : release.toString();
+    }
+    return null;
   }
 
   private void writeJarAndPomBuild() throws IOException {
