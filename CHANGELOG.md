@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 - Self-apply published `0.3.0`.
+- `io.github.ben-manes:gradle-versions-plugin` 0.67.0 and the Gradle wrapper 9.9.0.
 
 ## [0.3.0] - 2026-10-20
 - Self-apply published `0.2.0` and drop the explicit `com.gradleup.nmcp.settings`, `maven-publish`, and `signing` lines.

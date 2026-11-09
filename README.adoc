@@ -65,10 +65,13 @@ pluginManagement {
   }
   // String path: a File would call Settings.includeBuild (not a plugin build)
   // and `org.podval.conventions.settings` would not resolve.
-  final String conventionsDir =
-    providers.gradleProperty('podvalGradleDir').getOrElse('../podval-gradle')
-  if (file(conventionsDir).isDirectory() && file("${conventionsDir}/settings.gradle").isFile()) {
-    includeBuild conventionsDir
+  // When this build has a parent, that parent already included podval-gradle.
+  if (gradle.parent == null) {
+    final String conventionsDir =
+      providers.gradleProperty('podvalGradleDir').getOrElse('../podval-gradle')
+    if (file(conventionsDir).isDirectory() && file("${conventionsDir}/settings.gradle").isFile()) {
+      includeBuild conventionsDir
+    }
   }
 }
 plugins {
@@ -88,8 +91,8 @@ Consumers pin `org.podval.conventions.settings` `0.3.0` so CI works without a co
 Local checkout substitutes, same as site-publisher.
 Keep the `includeBuild` path a `String`.
 Do not replace that snippet with an init script.
-`gradlePluginPortal()` stays in `pluginManagement`, because Foojay 1.0.0 and `gradle-versions-plugin` 0.66.0 are not on
-Maven Central.
+`gradlePluginPortal()` stays in `pluginManagement`, because both `gradle-versions-plugin` 0.67.0 and `foojay-resolver`
+1.0.0 were checked on 2026-11-09 and are not on Maven Central.
 
 `pluginManagement { repositories { mavenCentral() } }` is already required for `org.podval.tools.site-publisher` if that
 plugin is also Central-only.
