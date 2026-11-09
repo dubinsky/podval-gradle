@@ -177,7 +177,9 @@ final class ConventionsPluginTest {
         doLast {
           assert java.toolchain.languageVersion.get() == JavaLanguageVersion.of(25)
           def params = tasks.named('compileScala').get().scalaCompileOptions.additionalParameters
-          assert params.contains('-release:25')
+          assert params[0] == '-java-output-version:25'
+          assert params.contains('-java-output-version:25')
+          assert !params.any { it.startsWith('-release') }
           assert params.contains('-new-syntax')
           assert params.contains('-feature')
           assert params.contains('-language:strictEquality')
@@ -609,7 +611,8 @@ final class ConventionsPluginTest {
       tasks.register('assertFlags') {
         doLast {
           def params = tasks.named('compileScala').get().scalaCompileOptions.additionalParameters
-          assert params.contains('-release:25')
+          assert params.contains('-java-output-version:25')
+          assert !params.any { it.startsWith('-release') }
           assert params.contains('-new-syntax')
           assert params.contains('-feature')
           assert params.contains('-language:strictEquality')
@@ -636,7 +639,8 @@ final class ConventionsPluginTest {
       tasks.register('assertFlags') {
         doLast {
           def params = tasks.named('compileScala').get().scalaCompileOptions.additionalParameters
-          assert params.contains('-release:25')
+          assert params.contains('-java-output-version:25')
+          assert !params.any { it.startsWith('-release') }
           assert params.contains('-new-syntax')
           assert params.contains('-feature')
           assert params.contains('-language:strictEquality')
@@ -670,12 +674,136 @@ final class ConventionsPluginTest {
       tasks.register('assertFlags') {
         doLast {
           def params = tasks.named('compileScala').get().scalaCompileOptions.additionalParameters
-          assert params.contains('-release:25')
+          assert params.contains('-java-output-version:25')
+          assert !params.any { it.startsWith('-release') }
           assert params.contains('-new-syntax')
           assert params.contains('-feature')
           assert params.contains('-language:strictEquality')
           assert params.contains('-source:future')
           assert params.contains('-extra-token')
+        }
+      }
+      """
+    );
+    BuildResult result = runner("assertFlags").build();
+    assertEquals(TaskOutcome.SUCCESS, result.task(":assertFlags").getOutcome());
+  }
+
+  @Test
+  void javaOutputVersionFollowsJvmLanguageVersionUntilSet() throws IOException {
+    writeSettingsWithConventions();
+    writeBuild(
+      """
+      plugins {
+        id 'scala'
+        id 'org.podval.conventions'
+      }
+      scala.scalaVersion = '3.9.0'
+      podval.jvmLanguageVersion.set(JavaLanguageVersion.of(21))
+      tasks.register('assertFlags') {
+        doLast {
+          assert podval.javaOutputVersion.get() == 21
+          def params = tasks.named('compileScala').get().scalaCompileOptions.additionalParameters
+          assert params.contains('-java-output-version:21')
+          assert !params.any { it.startsWith('-release') }
+          assert java.toolchain.languageVersion.get() == JavaLanguageVersion.of(21)
+        }
+      }
+      """
+    );
+    BuildResult followed = runner("assertFlags").build();
+    assertEquals(TaskOutcome.SUCCESS, followed.task(":assertFlags").getOutcome());
+
+    writeBuild(
+      """
+      plugins {
+        id 'scala'
+        id 'org.podval.conventions'
+      }
+      scala.scalaVersion = '3.9.0'
+      podval {
+        jvmLanguageVersion.set(JavaLanguageVersion.of(21))
+        javaOutputVersion = 17
+      }
+      tasks.register('assertFlags') {
+        doLast {
+          assert podval.javaOutputVersion.get() == 17
+          def params = tasks.named('compileScala').get().scalaCompileOptions.additionalParameters
+          assert params.contains('-java-output-version:17')
+          assert !params.any { it.startsWith('-release') }
+          assert java.toolchain.languageVersion.get() == JavaLanguageVersion.of(21)
+        }
+      }
+      """
+    );
+    BuildResult overridden = runner("assertFlags").build();
+    assertEquals(TaskOutcome.SUCCESS, overridden.task(":assertFlags").getOutcome());
+  }
+
+  @Test
+  void javaOutputVersionFlagInExtensionListFails() throws IOException {
+    writeSettingsWithConventions();
+    writeBuild(
+      """
+      plugins {
+        id 'scala'
+        id 'org.podval.conventions'
+      }
+      scala.scalaVersion = '3.9.0'
+      podval.scalaCompilerParameters.add('-release:17')
+      tasks.named('compileScala').get()
+      """
+    );
+    BuildResult release = runner("help").buildAndFail();
+    assertTrue(
+      release.getOutput().contains(
+        "podval.scalaCompilerParameters contains '-release:17'; set podval.javaOutputVersion instead"
+      ),
+      release.getOutput()
+    );
+
+    writeBuild(
+      """
+      plugins {
+        id 'scala'
+        id 'org.podval.conventions'
+      }
+      scala.scalaVersion = '3.9.0'
+      podval.scalaCompilerParameters.add('-java-output-version:17')
+      tasks.named('compileScala').get()
+      """
+    );
+    BuildResult outputVersion = runner("help").buildAndFail();
+    assertTrue(
+      outputVersion.getOutput().contains(
+        "podval.scalaCompilerParameters contains '-java-output-version:17'; set podval.javaOutputVersion instead"
+      ),
+      outputVersion.getOutput()
+    );
+  }
+
+  @Test
+  void foreignScalaFlagSurvivesMerge() throws IOException {
+    writeSettingsWithConventions();
+    writeBuild(
+      """
+      plugins {
+        id 'scala'
+      }
+      scala.scalaVersion = '3.9.0'
+      def compileScala = tasks.named('compileScala').get()
+      compileScala.scalaCompileOptions.additionalParameters = ['-release:17', '-scalajs']
+      pluginManager.apply 'org.podval.conventions'
+      tasks.register('assertFlags') {
+        doLast {
+          def params = tasks.named('compileScala').get().scalaCompileOptions.additionalParameters
+          assert params.contains('-scalajs')
+          assert params.contains('-new-syntax')
+          assert params.contains('-java-output-version:25')
+          assert params.count {
+            it.startsWith('-java-output-version') || it.startsWith('-release') || it.startsWith('--release')
+          } == 1
+          assert !params.any { it.startsWith('-release') }
         }
       }
       """

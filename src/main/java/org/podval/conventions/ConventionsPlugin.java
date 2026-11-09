@@ -1,11 +1,13 @@
 package org.podval.conventions;
 
+import org.gradle.api.GradleException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.plugins.JavaPluginExtension;
 import org.gradle.api.plugins.scala.ScalaPluginExtension;
 import org.gradle.api.tasks.scala.ScalaCompile;
 import org.gradle.jvm.toolchain.JavaLanguageVersion;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -24,6 +26,9 @@ public final class ConventionsPlugin implements Plugin<Project> {
     ConventionsExtension podval =
       project.getExtensions().create(ConventionsExtension.NAME, ConventionsExtension.class);
     podval.getJvmLanguageVersion().convention(JavaLanguageVersion.of(JVM));
+    podval.getJavaOutputVersion().convention(
+      podval.getJvmLanguageVersion().map(JavaLanguageVersion::asInt)
+    );
 
     project.getPluginManager().withPlugin("java", unused -> {
       JavaPluginExtension java = project.getExtensions().getByType(JavaPluginExtension.class);
@@ -37,14 +42,41 @@ public final class ConventionsPlugin implements Plugin<Project> {
     });
 
     // After the build script edits the list, including when compileScala is already realized.
-    // The copy is the task input; a later afterEvaluate may still append on the task.
-    project.afterEvaluate(ignored -> {
-      List<String> flags = List.copyOf(podval.getScalaCompilerParameters());
-      project.getTasks().configureEach(task -> {
-        if (task instanceof ScalaCompile scalaCompile) {
-          scalaCompile.getScalaCompileOptions().setAdditionalParameters(flags);
+    // A later afterEvaluate may still append on the task.
+    project.afterEvaluate(ignored -> project.getTasks().withType(ScalaCompile.class).configureEach(
+      scalaCompile -> applyScalaFlags(scalaCompile, podval)
+    ));
+  }
+
+  private static void applyScalaFlags(ScalaCompile scalaCompile, ConventionsExtension podval) {
+    List<String> extensionFlags = podval.getScalaCompilerParameters();
+    for (String flag : extensionFlags) {
+      if (flag.startsWith("-release") || flag.startsWith("-java-output-version")) {
+        throw new GradleException(
+          "podval.scalaCompilerParameters contains '" + flag + "'; set podval.javaOutputVersion instead"
+        );
+      }
+    }
+
+    String javaOutputFlag = "-java-output-version:" + podval.getJavaOutputVersion().get();
+    List<String> current = scalaCompile.getScalaCompileOptions().getAdditionalParameters();
+    List<String> merged = new ArrayList<>();
+    if (current != null) {
+      for (String flag : current) {
+        if (flag.startsWith("-release")
+          || flag.startsWith("-java-output-version")
+          || flag.startsWith("--release")) {
+          continue;
         }
-      });
-    });
+        merged.add(flag);
+      }
+    }
+    merged.add(0, javaOutputFlag);
+    for (String flag : extensionFlags) {
+      if (!merged.contains(flag)) {
+        merged.add(flag);
+      }
+    }
+    scalaCompile.getScalaCompileOptions().setAdditionalParameters(merged);
   }
 }

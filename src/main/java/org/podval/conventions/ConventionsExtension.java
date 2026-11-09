@@ -19,7 +19,6 @@ public abstract class ConventionsExtension {
   static final String UNSAFE_ACCESS = "--sun-misc-unsafe-memory-access=allow";
 
   private final List<String> scalaCompilerParameters = new ArrayList<>(List.of(
-    "-release:" + ConventionsPlugin.JVM,
     "-new-syntax",
     "-feature",
     "-language:strictEquality",
@@ -31,6 +30,8 @@ public abstract class ConventionsExtension {
   protected abstract Project getProject();
 
   public abstract Property<JavaLanguageVersion> getJvmLanguageVersion();
+
+  public abstract Property<Integer> getJavaOutputVersion();
 
   public List<String> getScalaCompilerParameters() {
     return scalaCompilerParameters;

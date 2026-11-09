@@ -20,9 +20,10 @@ Central Portal `USER_MANAGED` from `mavenCentralUsername` and `mavenCentralPassw
 Creates the `podval` extension.
 If `java` is present (covers `java-library` / `scala`): the Java toolchain `languageVersion` is conventioned to
 `podval.jvmLanguageVersion` (default 25).
-If `scala` is present: compiler parameters from `podval.scalaCompilerParameters` (`-release:25`, `-new-syntax`,
-`-feature`, `-language:strictEquality`, `-source:future`), `scala.scalaVersion` from the `scalaVersion` Gradle property
-when that property is set, and `scala.zincVersion` conventioned to `1.12.1`.
+If `scala` is present: compiler parameters from `podval.scalaCompilerParameters` (`-new-syntax`, `-feature`,
+`-language:strictEquality`, `-source:future`) and `-java-output-version:N` from `podval.javaOutputVersion`,
+`scala.scalaVersion` from the `scalaVersion` Gradle property when that property is set, and `scala.zincVersion`
+conventioned to `1.12.1`.
 Does **not** skip `compileJava`.
 Does **not** call `allowJdk25RestrictedAccess()`.
 `org.podval.conventions.publish` (`build.gradle`; libraries and Gradle-plugin projects)::
@@ -146,15 +147,17 @@ podval.jvmLanguageVersion.get()
 
 podval {
   jvmLanguageVersion.set(JavaLanguageVersion.of(21))
+  javaOutputVersion = 17
   scalaCompilerParameters.add('-Xfatal-warnings')
   scalaCompilerParameters.remove('-source:future')
   allowJdk25RestrictedAccess()
 }
 ----
 
-`scalaCompilerParameters` starts as `-release:25`, `-new-syntax`, `-feature`, `-language:strictEquality`, and
-`-source:future`.
-Changing `jvmLanguageVersion` does not rewrite that list.
+`scalaCompilerParameters` starts as `-new-syntax`, `-feature`, `-language:strictEquality`, and `-source:future`.
+`javaOutputVersion` follows `jvmLanguageVersion` until set.
+The emitted flag is `-java-output-version:N`.
+A `-release` or `-java-output-version` entry in the list fails.
 Edit the list in the build script.
 `allowJdk25RestrictedAccess()` adds `--enable-native-access=ALL-UNNAMED` and `--sun-misc-unsafe-memory-access=allow` to
 this project's `JavaExec` and `Test` tasks.
