@@ -1016,6 +1016,15 @@ final class ConventionsPluginTest {
       availableRelease(report, "com.example.fake", "widget"),
       Files.readString(report)
     );
+    // The weekly workflow passes no --revision. The default is milestone, which files the same
+    // candidate under available.milestone and leaves available.release null.
+    BuildResult defaultRevision = runner("dependencyUpdates", "--output-formatter=json").build();
+    assertTrue(defaultRevision.getOutput().contains("BUILD SUCCESSFUL"), defaultRevision.getOutput());
+    assertEquals(
+      "9.0.0-core.0.5",
+      outdatedAvailable(report, "com.example.fake", "widget"),
+      Files.readString(report)
+    );
 
     runner("help", "--configuration-cache").build();
     BuildResult cached = runner("help", "--configuration-cache").build();
@@ -1133,6 +1142,28 @@ final class ConventionsPluginTest {
   }
 
   private static String availableRelease(Path reportFile, String group, String name) {
+    Map<?, ?> versions = availableVersions(reportFile, group, name);
+    if (versions == null) {
+      return null;
+    }
+    Object release = versions.get("release");
+    return release == null ? null : release.toString();
+  }
+
+  private static String outdatedAvailable(Path reportFile, String group, String name) {
+    Map<?, ?> versions = availableVersions(reportFile, group, name);
+    if (versions == null) {
+      return null;
+    }
+    Object release = versions.get("release");
+    if (release != null) {
+      return release.toString();
+    }
+    Object milestone = versions.get("milestone");
+    return milestone == null ? null : milestone.toString();
+  }
+
+  private static Map<?, ?> availableVersions(Path reportFile, String group, String name) {
     Object parsed = new JsonSlurper().parse(reportFile.toFile());
     if (!(parsed instanceof Map<?, ?> report)) {
       return null;
@@ -1156,8 +1187,7 @@ final class ConventionsPluginTest {
       if (!(available instanceof Map<?, ?> versions)) {
         return null;
       }
-      Object release = versions.get("release");
-      return release == null ? null : release.toString();
+      return versions;
     }
     return null;
   }
