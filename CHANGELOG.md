@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `podval.javaOutputVersion` is the Java platform version, emitted as `-java-output-version:N`, conventioned from
   `jvmLanguageVersion` until set.
   The compiler-parameter list no longer contains `-release`.
+- Applying `org.podval.conventions.publish` before `scala` fails, so `javadocJar` is built from ScalaDoc.
 
 ## [0.3.0] - 2026-10-20
 - Self-apply published `0.2.0` and drop the explicit `com.gradleup.nmcp.settings`, `maven-publish`, and `signing` lines.

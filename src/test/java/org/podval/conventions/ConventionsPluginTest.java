@@ -347,6 +347,27 @@ final class ConventionsPluginTest {
   }
 
   @Test
+  void scalaBeforePublishIsRequired() throws IOException {
+    writeSettingsWithConventions();
+    writeBuild(
+      """
+      plugins {
+        id 'java-library'
+        id 'org.podval.conventions.publish'
+        id 'scala'
+      }
+      """
+    );
+    BuildResult result = runner("help").buildAndFail();
+    assertTrue(
+      result.getOutput().contains(
+        "Apply scala before org.podval.conventions.publish so javadocJar is built from ScalaDoc"
+      ),
+      result.getOutput()
+    );
+  }
+
+  @Test
   void scalaVersionFromGradleProperties() throws IOException {
     writeSettingsWithConventions();
     Files.writeString(

@@ -64,7 +64,9 @@ public final class ConventionsPublishPlugin implements Plugin<Project> {
 
   private static void registerJavadocJarFromScalaDoc(Project project) {
     if (project.getTasks().getNames().contains("javadocJar")) {
-      return;
+      throw new GradleException(
+        "Apply scala before org.podval.conventions.publish so javadocJar is built from ScalaDoc"
+      );
     }
     project.getTasks().register("javadocJar", Jar.class, jar -> {
       jar.setGroup("build");

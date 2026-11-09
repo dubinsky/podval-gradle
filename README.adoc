@@ -205,6 +205,7 @@ Sites leave the property unset.
 
 Apply `scala` (when used) **before** `org.podval.conventions.publish` so `javadocJar` is registered from ScalaDoc before
 `withJavadocJar()` reuses it.
+The other order fails with `Apply scala before org.podval.conventions.publish so javadocJar is built from ScalaDoc`.
 Apply `java-gradle-plugin` or `com.gradle.plugin-publish` **before** `org.podval.conventions.publish`.
 `library` is created for Java libraries and is not created for Gradle plugin projects.
 `pluginMaven` and marker publications are the plugin coordinates.
