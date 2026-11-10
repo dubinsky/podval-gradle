@@ -51,7 +51,7 @@ public abstract class ConventionsExtension {
   public void allowJdkRestrictedAccess() {
     Project project = getProject();
     project.getTasks().withType(JavaExec.class).configureEach(task -> {
-      // jvmArgs replaces run's convention from applicationDefaultJvmArgs, dropping -Xss8m.
+      // jvmArgs replaces run's convention from applicationDefaultJvmArgs.
       if ("run".equals(task.getName())) {
         return;
       }
