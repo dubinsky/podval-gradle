@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -1031,6 +1032,7 @@ final class ConventionsPluginTest {
       String output = redact(second.getOutput(), key, passphrase);
       assertTrue(output.contains("Reusing configuration cache."), output);
       assertSignatureFiles();
+      assertSignedByThrowawayKey(gnupgHome);
     } finally {
       killGnupg(gnupgHome);
       deleteTree(gnupgHome);
@@ -1373,10 +1375,21 @@ final class ConventionsPluginTest {
         .withProjectDir(projectDir.toFile())
         .withPluginClasspath()
         .withArguments(arguments)
+        .withEnvironment(signingRunnerEnvironment())
         .build();
     } catch (RuntimeException failure) {
       throw new AssertionError(redact(String.valueOf(failure.getMessage()), key, passphrase));
     }
+  }
+
+  private static Map<String, String> signingRunnerEnvironment() {
+    // These outrank the temp project's gradle.properties and would sign with another key.
+    Map<String, String> environment = new HashMap<>(System.getenv());
+    environment.remove("ORG_GRADLE_PROJECT_signingKey");
+    environment.remove("ORG_GRADLE_PROJECT_signingPassword");
+    environment.remove("org.gradle.project.signingKey");
+    environment.remove("org.gradle.project.signingPassword");
+    return environment;
   }
 
   private void assertSignatureFiles() throws IOException {
@@ -1392,6 +1405,28 @@ final class ConventionsPluginTest {
       String text = Files.readString(signature);
       assertTrue(text.contains("-----BEGIN PGP SIGNATURE-----"), signature.toString());
     }
+  }
+
+  private void assertSignedByThrowawayKey(Path gnupgHome) throws IOException {
+    Path jar = projectDir.resolve("build/libs/conventions-test-1.2.3.jar");
+    Path signature = projectDir.resolve("build/libs/conventions-test-1.2.3.jar.asc");
+    assertTrue(Files.isRegularFile(jar), jar.toString());
+    assertTrue(Files.isRegularFile(signature), signature.toString());
+    // Only the public key in this homedir can verify. Do not retrieve any other key.
+    runGpg(
+      gnupgHome,
+      List.of(
+        "gpg",
+        "--batch",
+        "--homedir", gnupgHome.toString(),
+        "--trust-model", "always",
+        "--no-auto-key-retrieve",
+        "--verify",
+        signature.toString(),
+        jar.toString()
+      ),
+      false
+    );
   }
 
   private static String exportThrowawaySigningKey(Path gnupgHome, String passphrase) throws IOException {
