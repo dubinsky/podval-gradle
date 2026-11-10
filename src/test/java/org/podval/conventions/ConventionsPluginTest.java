@@ -7,12 +7,20 @@ import org.gradle.testkit.runner.TaskOutcome;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
+import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -944,6 +952,34 @@ final class ConventionsPluginTest {
   }
 
   @Test
+  void implementationTitleUsesPublishName() throws IOException {
+    writeSettingsWithConventions();
+    writeBuild(
+      """
+      plugins {
+        id 'java-library'
+        id 'org.podval.conventions.publish'
+      }
+      version = '1.2.3'
+      podvalPublish {
+        gitHubRepository = 'dubinsky/xml'
+        name = 'Podval XML'
+      }
+      """
+    );
+    BuildResult result = runner("jar").build();
+    assertEquals(TaskOutcome.SUCCESS, result.task(":jar").getOutcome());
+    Path jar = projectDir.resolve("build/libs/conventions-test-1.2.3.jar");
+    assertTrue(Files.isRegularFile(jar), jar.toString());
+    try (JarFile jarFile = new JarFile(jar.toFile())) {
+      assertEquals(
+        "Podval XML",
+        jarFile.getManifest().getMainAttributes().getValue("Implementation-Title")
+      );
+    }
+  }
+
+  @Test
   void configurationCacheReusesJarAndPom() throws IOException {
     writeJarAndPomBuild();
     runner("jar", "generatePomFileForLibraryPublication", "--configuration-cache").build();
@@ -975,6 +1011,30 @@ final class ConventionsPluginTest {
     ).build();
     assertTrue(second.getOutput().contains("Reusing configuration cache."), second.getOutput());
     assertTrue(second.getOutput().contains("BUILD SUCCESSFUL"), second.getOutput());
+  }
+
+  @Test
+  void configurationCacheSignsWithDummyKey() throws IOException {
+    // Throwaway key in its own GNUPGHOME. Do not use the default ~/.gnupg.
+    Path gnupgHome = Files.createTempDirectory("podval-signing-gnupg-");
+    Files.setPosixFilePermissions(
+      gnupgHome,
+      Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE)
+    );
+    String passphrase = "throwaway-signing-passphrase";
+    try {
+      String key = exportThrowawaySigningKey(gnupgHome, passphrase);
+      writeJarAndPomBuild();
+      writeSigningProperties(key, passphrase);
+      runSigning(key, passphrase, "signLibraryPublication", "--configuration-cache");
+      BuildResult second = runSigning(key, passphrase, "signLibraryPublication", "--configuration-cache");
+      String output = redact(second.getOutput(), key, passphrase);
+      assertTrue(output.contains("Reusing configuration cache."), output);
+      assertSignatureFiles();
+    } finally {
+      killGnupg(gnupgHome);
+      deleteTree(gnupgHome);
+    }
   }
 
   @Test
@@ -1296,5 +1356,145 @@ final class ConventionsPluginTest {
       .withPluginClasspath()
       .withArguments(arguments)
       .forwardOutput();
+  }
+
+  private void writeSigningProperties(String key, String passphrase) throws IOException {
+    Properties properties = new Properties();
+    properties.setProperty("signingKey", key);
+    properties.setProperty("signingPassword", passphrase);
+    try (OutputStream out = Files.newOutputStream(projectDir.resolve("gradle.properties"))) {
+      properties.store(out, null);
+    }
+  }
+
+  private BuildResult runSigning(String key, String passphrase, String... arguments) {
+    try {
+      return GradleRunner.create()
+        .withProjectDir(projectDir.toFile())
+        .withPluginClasspath()
+        .withArguments(arguments)
+        .build();
+    } catch (RuntimeException failure) {
+      throw new AssertionError(redact(String.valueOf(failure.getMessage()), key, passphrase));
+    }
+  }
+
+  private void assertSignatureFiles() throws IOException {
+    List<Path> signatures;
+    try (Stream<Path> walk = Files.walk(projectDir.resolve("build"))) {
+      signatures = walk
+        .filter(Files::isRegularFile)
+        .filter(path -> path.getFileName().toString().endsWith(".asc"))
+        .toList();
+    }
+    assertTrue(signatures.size() > 1, signatures.toString());
+    for (Path signature : signatures) {
+      String text = Files.readString(signature);
+      assertTrue(text.contains("-----BEGIN PGP SIGNATURE-----"), signature.toString());
+    }
+  }
+
+  private static String exportThrowawaySigningKey(Path gnupgHome, String passphrase) throws IOException {
+    runGpg(
+      gnupgHome,
+      List.of(
+        "gpg",
+        "--batch",
+        "--pinentry-mode", "loopback",
+        "--homedir", gnupgHome.toString(),
+        "--passphrase", passphrase,
+        "--quick-gen-key", "Podval Test <podval-test@example.invalid>",
+        "rsa3072", "sign", "never"
+      ),
+      false
+    );
+    String armored = runGpg(
+      gnupgHome,
+      List.of(
+        "gpg",
+        "--batch",
+        "--pinentry-mode", "loopback",
+        "--homedir", gnupgHome.toString(),
+        "--passphrase", passphrase,
+        "--armor",
+        "--export-secret-keys"
+      ),
+      true
+    );
+    if (!armored.contains("-----BEGIN PGP PRIVATE KEY BLOCK-----")
+      || !armored.contains("-----END PGP PRIVATE KEY BLOCK-----")) {
+      throw new IOException("gpg did not export an armored secret key");
+    }
+    return armored;
+  }
+
+  private static String runGpg(Path gnupgHome, List<String> command, boolean captureOutput) throws IOException {
+    Path stdoutFile = gnupgHome.resolve(captureOutput ? "export-stdout" : "gpg-stdout");
+    Path stderrFile = gnupgHome.resolve(captureOutput ? "export-stderr" : "gpg-stderr");
+    ProcessBuilder builder = new ProcessBuilder(command);
+    builder.environment().put("GNUPGHOME", gnupgHome.toString());
+    builder.redirectOutput(stdoutFile.toFile());
+    builder.redirectError(stderrFile.toFile());
+    try {
+      Process process = builder.start();
+      if (!process.waitFor(60, TimeUnit.SECONDS)) {
+        process.destroyForcibly();
+        throw new IOException("gpg timed out");
+      }
+      if (process.exitValue() != 0) {
+        throw new IOException("gpg exited " + process.exitValue());
+      }
+      return captureOutput ? Files.readString(stdoutFile) : "";
+    } catch (InterruptedException exception) {
+      Thread.currentThread().interrupt();
+      throw new IOException("gpg interrupted", exception);
+    } finally {
+      Files.deleteIfExists(stdoutFile);
+      Files.deleteIfExists(stderrFile);
+    }
+  }
+
+  private static void killGnupg(Path gnupgHome) {
+    ProcessBuilder builder = new ProcessBuilder(
+      "gpgconf", "--homedir", gnupgHome.toString(), "--kill", "all"
+    );
+    builder.environment().put("GNUPGHOME", gnupgHome.toString());
+    builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+    builder.redirectError(ProcessBuilder.Redirect.DISCARD);
+    try {
+      Process process = builder.start();
+      if (!process.waitFor(30, TimeUnit.SECONDS)) {
+        process.destroyForcibly();
+      }
+    } catch (IOException | InterruptedException exception) {
+      if (exception instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+
+  private static void deleteTree(Path root) throws IOException {
+    if (!Files.exists(root)) {
+      return;
+    }
+    try (Stream<Path> walk = Files.walk(root)) {
+      List<Path> paths = walk.sorted(Comparator.reverseOrder()).toList();
+      for (Path path : paths) {
+        Files.deleteIfExists(path);
+      }
+    }
+  }
+
+  private static String redact(String text, String key, String passphrase) {
+    String redacted = text.replace(passphrase, "[redacted]");
+    redacted = redacted.replace(key, "[redacted]");
+    redacted = redacted.replace(key.replace("\r\n", "\n").replace("\n", "\\n"), "[redacted]");
+    for (String line : key.split("\\R")) {
+      String trimmed = line.trim();
+      if (trimmed.length() >= 16 && !trimmed.startsWith("-----")) {
+        redacted = redacted.replace(trimmed, "[redacted]");
+      }
+    }
+    return redacted;
   }
 }

@@ -86,10 +86,10 @@ public final class ConventionsPublishPlugin implements Plugin<Project> {
       jar.setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE);
       Provider<String> vendor = extension.getOrgName();
       Provider<String> implVersion = jar.getArchiveVersion();
-      String title = project.getName();
+      Provider<String> title = extension.getName();
       jar.doFirst(task -> {
         Map<String, Object> attributes = new LinkedHashMap<>();
-        attributes.put("Implementation-Title", title);
+        attributes.put("Implementation-Title", title.get());
         attributes.put("Implementation-Version", implVersion.get());
         attributes.put("Implementation-Vendor", vendor.get());
         ((Jar) task).getManifest().attributes(attributes);

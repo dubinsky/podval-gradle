@@ -35,9 +35,10 @@ only (not `compileTestJava`, not the whole build's excluded-task list).
 Does **not** call `allowJdkRestrictedAccess()`.
 `org.podval.conventions.publish` (`build.gradle`; libraries and Gradle-plugin projects)::
 Applies `maven-publish` and `signing`.
-`javadocJar` from ScalaDoc **before** `withJavadocJar()`; `withSourcesJar()`; jar `duplicatesStrategy = EXCLUDE` and
-Implementation-* manifest; Maven publication POM (SCM, issues, CI, Apache-2.0, developer) and in-memory signing from
-`signingKey` / `signingPassword`.
+`javadocJar` from ScalaDoc **before** `withJavadocJar()`; `withSourcesJar()`; jar `duplicatesStrategy = EXCLUDE` and an
+Implementation-* manifest (`Implementation-Title` comes from `podvalPublish.name`, which defaults to the project name);
+Maven publication POM (SCM, issues, CI, Apache-2.0, developer) and in-memory signing from `signingKey` /
+`signingPassword`.
 Creates a `library` publication for Java libraries.
 Does not create `library` for Gradle plugin projects (`pluginMaven` and marker publications are those coordinates).
 Apply `java-gradle-plugin` or `com.gradle.plugin-publish` before this plugin.

@@ -20,6 +20,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `allowJdkRestrictedAccess()` replaces the JDK 25 restricted-access helper, with no alias.
   Flags still go on `JavaExec` (except `run`) and `Test`, and are merged into `applicationDefaultJvmArgs` so `run` and
   the start script see them.
+- Jar manifest `Implementation-Title` comes from `podvalPublish.name`, which defaults to the project name.
+- `useInMemoryPgpKeys` is still `String` on Gradle 9.9, so the key is stored in the configuration cache, and that is an
+  accepted risk.
 
 ## [0.3.0] - 2026-10-20
 - Self-apply published `0.2.0` and drop the explicit `com.gradleup.nmcp.settings`, `maven-publish`, and `signing` lines.
