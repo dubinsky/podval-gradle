@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.4.0] - 2026-11-09
 - Self-apply published `0.3.0`.
 - `io.github.ben-manes:gradle-versions-plugin` 0.67.0 and the Gradle wrapper 9.9.0.
 - `podval.javaOutputVersion` is the Java platform version, emitted as `-java-output-version:N`, conventioned from
