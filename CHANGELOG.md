@@ -17,6 +17,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `podval.compileJavaEnabled` defaults to true.
   Setting it to `false` disables that project's `compileJava` only, not `compileTestJava` and not the build's
   excluded-task list.
+- `allowJdkRestrictedAccess()` replaces the JDK 25 restricted-access helper, with no alias.
+  Flags still go on `JavaExec` (except `run`) and `Test`, and are merged into `applicationDefaultJvmArgs` so `run` and
+  the start script see them.
 
 ## [0.3.0] - 2026-10-20
 - Self-apply published `0.2.0` and drop the explicit `com.gradleup.nmcp.settings`, `maven-publish`, and `signing` lines.

@@ -1004,30 +1004,47 @@ final class ConventionsPluginTest {
         id 'application'
         id 'org.podval.conventions'
       }
+      podval.allowJdkRestrictedAccess()
+      podval.allowJdkRestrictedAccess()
       application {
         mainClass = 'example.Main'
-        applicationDefaultJvmArgs = [
-          '--enable-native-access=ALL-UNNAMED',
-          '--sun-misc-unsafe-memory-access=allow'
-        ]
+        applicationDefaultJvmArgs = ['-Xss8m']
       }
-      podval.allowJdk25RestrictedAccess()
-      podval.allowJdk25RestrictedAccess()
       tasks.register('app', JavaExec) {
         classpath = sourceSets.main.runtimeClasspath
         mainClass = 'example.Main'
       }
-      def once = { args ->
-        assert args.count { it == '--enable-native-access=ALL-UNNAMED' } == 1
-        assert args.count { it == '--sun-misc-unsafe-memory-access=allow' } == 1
+      tasks.register('assertFlags') {
+        def nativeAccess = '--enable-native-access=ALL-UNNAMED'
+        def unsafeAccess = '--sun-misc-unsafe-memory-access=allow'
+        def applicationArgs = application.applicationDefaultJvmArgs.toList()
+        def startScriptsOpts = tasks.named('startScripts', CreateStartScripts).get().defaultJvmOpts.toList()
+        def runArgs = (tasks.named('run', JavaExec).get().jvmArgs ?: []).toList()
+        def testArgs = (tasks.named('test', Test).get().jvmArgs ?: []).toList()
+        def appArgs = (tasks.named('app', JavaExec).get().jvmArgs ?: []).toList()
+        doLast {
+          def once = { args ->
+            assert args.count { it == nativeAccess } == 1
+            assert args.count { it == unsafeAccess } == 1
+          }
+          def withStack = { args ->
+            assert args.contains('-Xss8m')
+            once(args)
+          }
+          withStack(applicationArgs)
+          withStack(startScriptsOpts)
+          withStack(runArgs)
+          once(testArgs)
+          once(appArgs)
+          assert !appArgs.contains('-Xss8m')
+        }
       }
-      once(tasks.named('test', Test).get().jvmArgs)
-      once(tasks.named('app', JavaExec).get().jvmArgs)
-      once(tasks.named('run', JavaExec).get().jvmArgs)
       """
     );
-    runner("help", "--configuration-cache").build();
-    BuildResult second = runner("help", "--configuration-cache").build();
+    BuildResult first = runner("assertFlags", "--configuration-cache").build();
+    assertEquals(TaskOutcome.SUCCESS, first.task(":assertFlags").getOutcome());
+    BuildResult second = runner("assertFlags", "--configuration-cache").build();
+    assertEquals(TaskOutcome.SUCCESS, second.task(":assertFlags").getOutcome());
     assertTrue(second.getOutput().contains("Reusing configuration cache."), second.getOutput());
   }
 

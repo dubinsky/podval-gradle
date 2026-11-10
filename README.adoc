@@ -32,7 +32,7 @@ If `scala` is present: compiler parameters from `podval.scalaCompilerParameters`
 conventioned to `1.12.1`.
 `compileJava` stays enabled by default, and `podval.compileJavaEnabled = false` disables that project's `compileJava`
 only (not `compileTestJava`, not the whole build's excluded-task list).
-Does **not** call `allowJdk25RestrictedAccess()`.
+Does **not** call `allowJdkRestrictedAccess()`.
 `org.podval.conventions.publish` (`build.gradle`; libraries and Gradle-plugin projects)::
 Applies `maven-publish` and `signing`.
 `javadocJar` from ScalaDoc **before** `withJavadocJar()`; `withSourcesJar()`; jar `duplicatesStrategy = EXCLUDE` and
@@ -143,7 +143,7 @@ The relative `uses` path does not need a tag.
 == `podval` extension
 
 `org.podval.conventions` creates `podval`.
-Read the JVM language version, add or remove Scala compiler parameters, or opt in to the JDK 25 helper:
+Read the JVM language version, add or remove Scala compiler parameters, or opt in to JDK restricted access:
 
 ----
 plugins {
@@ -160,7 +160,7 @@ podval {
   javaOutputVersion = 17
   scalaCompilerParameters.add('-Xfatal-warnings')
   scalaCompilerParameters.remove('-source:future')
-  allowJdk25RestrictedAccess()
+  allowJdkRestrictedAccess()
 }
 ----
 
@@ -169,8 +169,9 @@ podval {
 The emitted flag is `-java-output-version:N`.
 A `-release` or `-java-output-version` entry in the list fails.
 Edit the list in the build script.
-`allowJdk25RestrictedAccess()` adds `--enable-native-access=ALL-UNNAMED` and `--sun-misc-unsafe-memory-access=allow` to
-this project's `JavaExec` and `Test` tasks.
+`allowJdkRestrictedAccess()` adds `--enable-native-access=ALL-UNNAMED` and `--sun-misc-unsafe-memory-access=allow` to
+this project's `JavaExec` tasks (except `run`) and `Test` tasks, and merges them into `applicationDefaultJvmArgs` so
+`run` and the start script see them.
 Calling it again does not duplicate an argument that is already present.
 The plugin does not call it.
 

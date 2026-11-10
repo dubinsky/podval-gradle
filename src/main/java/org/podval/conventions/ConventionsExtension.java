@@ -2,6 +2,7 @@ package org.podval.conventions;
 
 import org.gradle.api.GradleException;
 import org.gradle.api.Project;
+import org.gradle.api.plugins.JavaApplication;
 import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.JavaExec;
 import org.gradle.api.tasks.testing.Test;
@@ -47,10 +48,38 @@ public abstract class ConventionsExtension {
     scalaCompilerParameters.addAll(parameters);
   }
 
-  public void allowJdk25RestrictedAccess() {
+  public void allowJdkRestrictedAccess() {
     Project project = getProject();
-    project.getTasks().withType(JavaExec.class).configureEach(ConventionsExtension::addRestrictedAccessArgs);
+    project.getTasks().withType(JavaExec.class).configureEach(task -> {
+      // jvmArgs replaces run's convention from applicationDefaultJvmArgs, dropping -Xss8m.
+      if ("run".equals(task.getName())) {
+        return;
+      }
+      addRestrictedAccessArgs(task);
+    });
     project.getTasks().withType(Test.class).configureEach(ConventionsExtension::addRestrictedAccessArgs);
+    // After the build script assigns applicationDefaultJvmArgs. run and the start script read that list.
+    project.getPluginManager().withPlugin("application", unused ->
+      project.afterEvaluate(ignored -> mergeRestrictedAccessIntoApplicationDefaults(project))
+    );
+  }
+
+  private static void mergeRestrictedAccessIntoApplicationDefaults(Project project) {
+    JavaApplication application = project.getExtensions().getByType(JavaApplication.class);
+    List<String> merged = new ArrayList<>();
+    Iterable<String> current = application.getApplicationDefaultJvmArgs();
+    if (current != null) {
+      for (String arg : current) {
+        merged.add(arg);
+      }
+    }
+    if (!merged.contains(NATIVE_ACCESS)) {
+      merged.add(NATIVE_ACCESS);
+    }
+    if (!merged.contains(UNSAFE_ACCESS)) {
+      merged.add(UNSAFE_ACCESS);
+    }
+    application.setApplicationDefaultJvmArgs(merged);
   }
 
   private static void addRestrictedAccessArgs(JavaForkOptions fork) {

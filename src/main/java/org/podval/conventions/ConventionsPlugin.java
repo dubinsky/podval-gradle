@@ -17,7 +17,7 @@ import java.util.List;
  * (covers {@code java-library} and {@code scala}), and Scala flags when {@code scala}
  * is present. Does not apply {@code java} or {@code scala}. Does not skip
  * {@code compileJava} by default; {@code compileJavaEnabled = false} disables that
- * project's {@code compileJava} only. Does not call {@code allowJdk25RestrictedAccess}.
+ * project's {@code compileJava} only. Does not call {@code allowJdkRestrictedAccess}.
  * {@code dependencyUpdates} comes from {@code org.podval.conventions.settings}.
  */
 public final class ConventionsPlugin implements Plugin<Project> {
