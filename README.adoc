@@ -76,13 +76,12 @@ pluginManagement {
   }
   // String path: a File would call Settings.includeBuild (not a plugin build)
   // and `org.podval.conventions.settings` would not resolve.
-  // When this build has a parent, that parent already included podval-gradle.
-  if (gradle.parent == null) {
-    final String conventionsDir =
-      providers.gradleProperty('podvalGradleDir').getOrElse('../podval-gradle')
-    if (file(conventionsDir).isDirectory() && file("${conventionsDir}/settings.gradle").isFile()) {
-      includeBuild conventionsDir
-    }
+  // An included build does not see its parent's pluginManagement include,
+  // and a second include of this same directory is accepted on Gradle 9.8.2 and 9.9.0.
+  final String conventionsDir =
+    providers.gradleProperty('podvalGradleDir').getOrElse('../podval-gradle')
+  if (file(conventionsDir).isDirectory() && file("${conventionsDir}/settings.gradle").isFile()) {
+    includeBuild conventionsDir
   }
 }
 plugins {
@@ -104,6 +103,8 @@ Consumers pin `org.podval.conventions.settings` `0.4.0` so CI works without a co
 `org.podval.conventions` and `org.podval.conventions.publish` apply from that same artifact already on the classpath.
 Local checkout substitutes, same as site-publisher.
 Keep the `includeBuild` path a `String`.
+Nested checkouts keep their own `getOrElse` (`../../Podval/podval-gradle` and `../../../podval-gradle`) rather than
+copying the `../podval-gradle` default.
 Do not replace that snippet with an init script.
 `gradlePluginPortal()` stays in `pluginManagement`, because both `gradle-versions-plugin` 0.67.0 and `foojay-resolver`
 1.0.0 were checked on 2026-11-09 and are not on Maven Central.

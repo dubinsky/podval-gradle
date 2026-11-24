@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - chore: elf-apply published `0.4.0`
 - chore: Gradle 9.9.1
 - chore: Gradle 9.9.2
+- The README `includeBuild` snippet has no `gradle.parent == null` guard.
+  Nested checkouts keep their own `getOrElse` (`../../Podval/podval-gradle` and `../../../podval-gradle`).
 
 ## [0.4.0] - 2026-11-09
 - Self-apply published `0.3.0`.
