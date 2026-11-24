@@ -12,6 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - chore: Gradle 9.9.2
 - The README `includeBuild` snippet has no `gradle.parent == null` guard.
   Nested checkouts keep their own `getOrElse` (`../../Podval/podval-gradle` and `../../../podval-gradle`).
+- `org.podval.conventions.settings` adds `mavenCentral()` at `settingsEvaluated` only when the repository handler is
+  still empty.
+  A declared list keeps its order.
 
 ## [0.4.0] - 2026-11-09
 - Self-apply published `0.3.0`.

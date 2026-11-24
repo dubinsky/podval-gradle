@@ -6,8 +6,9 @@ import org.gradle.api.Plugin;
 import org.gradle.api.initialization.Settings;
 
 /**
- * Foojay toolchain resolver, Maven Central for dependency resolution, and the
- * versions settings plugin with the shared {@code rejectVersionIf}.
+ * Foojay toolchain resolver, Maven Central when the repository handler is still
+ * empty at {@code settingsEvaluated}, and the versions settings plugin with the
+ * shared {@code rejectVersionIf}.
  * {@code podvalSettings.acceptVersionIf} may keep a non-stable version.
  * When {@code podvalCentral=true}, applies {@code com.gradleup.nmcp.settings} and
  * the USER_MANAGED Central Portal block.
@@ -26,7 +27,6 @@ public final class ConventionsSettingsPlugin implements Plugin<Settings> {
   public void apply(Settings settings) {
     settings.getPluginManager().apply(FOOJAY_PLUGIN_ID);
     settings.getPluginManager().apply(VERSIONS_SETTINGS_PLUGIN_ID);
-    settings.getDependencyResolutionManagement().getRepositories().mavenCentral();
     ConventionsSettingsExtension extension = settings.getExtensions().create(
       ConventionsSettingsExtension.NAME,
       ConventionsSettingsExtension.class
@@ -52,6 +52,12 @@ public final class ConventionsSettingsPlugin implements Plugin<Settings> {
         portal.getPassword().set(settings.getProviders().gradleProperty("mavenCentralPassword"));
       });
     }
+    settings.getGradle().settingsEvaluated(evaluated -> {
+      var repositories = evaluated.getDependencyResolutionManagement().getRepositories();
+      if (repositories.isEmpty()) {
+        repositories.mavenCentral();
+      }
+    });
   }
 
   private static boolean publishesToCentral(Settings settings) {

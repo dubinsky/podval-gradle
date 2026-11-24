@@ -10,7 +10,10 @@ Java binary plugins (`java-gradle-plugin`), same shape as `org.podval.tools.site
 Plugin ids:
 
 `org.podval.conventions.settings` (`settings.gradle`)::
-Foojay toolchain resolver; `dependencyResolutionManagement { repositories { mavenCentral() } }`.
+Foojay toolchain resolver.
+The plugin adds `mavenCentral()` at `settingsEvaluated` only when `dependencyResolutionManagement.repositories` is still
+empty.
+A declared list keeps its order.
 Applies `io.github.ben-manes.versions.settings` and the shared `rejectVersionIf` (non-stable + padded numeric `0.017`)
 on the root `dependencyUpdates` task.
 Stable keywords are whole `.` / `-` components (`RELEASE`, `FINAL`, `GA`), not substrings, so `1.0.0-legacy` is

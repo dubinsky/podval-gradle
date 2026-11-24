@@ -43,8 +43,97 @@ final class ConventionsPluginTest {
       assert pluginManager.hasPlugin('org.podval.conventions.settings')
       assert pluginManager.hasPlugin('io.github.ben-manes.versions.settings')
       assert !pluginManager.hasPlugin('com.gradleup.nmcp.settings')
-      assert dependencyResolutionManagement.repositories.size() > 0
+      gradle.settingsEvaluated { evaluated ->
+        def repositories = evaluated.dependencyResolutionManagement.repositories
+        assert repositories.size() == 1
+        assert repositories[0].name == 'MavenRepo'
+        assert repositories[0].url.toString() == 'https://repo.maven.apache.org/maven2/'
+      }
       rootProject.name = 'settings-test'
+      """
+    );
+    writeBuild("plugins { id 'org.podval.conventions' }\n");
+    BuildResult result = runner("help").build();
+    assertTrue(result.getOutput().contains("BUILD SUCCESSFUL"), result.getOutput());
+  }
+
+  @Test
+  void configurationCacheReusesMavenCentralWhenHandlerEmpty() throws IOException {
+    writeSettings(
+      """
+      plugins {
+        id 'org.podval.conventions.settings'
+      }
+      assert pluginManager.hasPlugin('org.gradle.toolchains.foojay-resolver-convention')
+      assert pluginManager.hasPlugin('org.podval.conventions.settings')
+      assert pluginManager.hasPlugin('io.github.ben-manes.versions.settings')
+      assert !pluginManager.hasPlugin('com.gradleup.nmcp.settings')
+      gradle.settingsEvaluated { evaluated ->
+        def repositories = evaluated.dependencyResolutionManagement.repositories
+        assert repositories.size() == 1
+        assert repositories[0].name == 'MavenRepo'
+        assert repositories[0].url.toString() == 'https://repo.maven.apache.org/maven2/'
+      }
+      rootProject.name = 'settings-test'
+      """
+    );
+    writeBuild("plugins { id 'org.podval.conventions' }\n");
+    runner("help", "--configuration-cache").build();
+    BuildResult second = runner("help", "--configuration-cache").build();
+    assertTrue(second.getOutput().contains("Reusing configuration cache."), second.getOutput());
+  }
+
+  @Test
+  void declaredRepositoriesAreNotPrepended() throws IOException {
+    writeSettings(
+      """
+      plugins {
+        id 'org.podval.conventions.settings'
+      }
+      dependencyResolutionManagement {
+        repositories {
+          maven {
+            url = 'https://maven-central.storage-download.googleapis.com/maven2/'
+          }
+          mavenCentral()
+        }
+      }
+      gradle.settingsEvaluated { evaluated ->
+        def repositories = evaluated.dependencyResolutionManagement.repositories
+        assert repositories*.name == ['maven', 'MavenRepo']
+        assert repositories[0].name != 'MavenRepo'
+        assert !repositories*.name.contains('MavenRepo2')
+        assert repositories*.url*.toString() == [
+          'https://maven-central.storage-download.googleapis.com/maven2/',
+          'https://repo.maven.apache.org/maven2/'
+        ]
+      }
+      rootProject.name = 'declared-repos'
+      """
+    );
+    writeBuild("plugins { id 'org.podval.conventions' }\n");
+    runner("help", "--configuration-cache").build();
+    BuildResult second = runner("help", "--configuration-cache").build();
+    assertTrue(second.getOutput().contains("Reusing configuration cache."), second.getOutput());
+  }
+
+  @Test
+  void nonEmptyHandlerWithoutMavenCentralIsLeftAlone() throws IOException {
+    writeSettings(
+      """
+      plugins {
+        id 'org.podval.conventions.settings'
+      }
+      dependencyResolutionManagement {
+        repositories {
+          mavenLocal()
+        }
+      }
+      gradle.settingsEvaluated { evaluated ->
+        def repositories = evaluated.dependencyResolutionManagement.repositories
+        assert repositories*.name == ['MavenLocal']
+      }
+      rootProject.name = 'maven-local-only'
       """
     );
     writeBuild("plugins { id 'org.podval.conventions' }\n");

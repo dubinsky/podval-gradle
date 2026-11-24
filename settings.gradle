@@ -11,10 +11,12 @@ plugins {
 
 rootProject.name = 'org.podval.conventions'
 
-// mavenCentral() comes from conventions.settings. This project's implementation
-// deps (gradle-versions-plugin, foojay-resolver) are on the Plugin Portal.
+// This handler is not empty, so conventions.settings does not add Central.
+// gradlePluginPortal() stays: gradle-versions-plugin 0.67.0 and foojay-resolver
+// 1.0.0 are not on Maven Central (README, checked 2026-11-09).
 dependencyResolutionManagement {
   repositories {
+    mavenCentral()
     gradlePluginPortal()
   }
 }
