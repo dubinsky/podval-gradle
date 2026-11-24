@@ -15,6 +15,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `org.podval.conventions.settings` adds `mavenCentral()` at `settingsEvaluated` only when the repository handler is
   still empty.
   A declared list keeps its order.
+- `org.podval.conventions.publish` configures the ScalaDoc `javadocJar`, `withJavadocJar()`, and the `library`
+  publication in `afterEvaluate`.
+  `scala` or `java-gradle-plugin` and this plugin work in either order in the same build script.
+  Applying `java-gradle-plugin` from a later `afterEvaluate` still fails with
+  `Apply java-gradle-plugin or com.gradle.plugin-publish before org.podval.conventions.publish`.
 
 ## [0.4.0] - 2026-11-09
 - Self-apply published `0.3.0`.

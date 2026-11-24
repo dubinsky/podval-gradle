@@ -515,6 +515,11 @@ final class ConventionsPluginTest {
           def jar = tasks.named('javadocJar', Jar).get()
           assert jar.archiveClassifier.get() == 'javadoc'
           assert jar.taskDependencies.getDependencies(jar).any { it.name == 'scaladoc' }
+          def javadocArtifacts = publishing.publications.library.artifacts.findAll { it.classifier == 'javadoc' }
+          assert javadocArtifacts.size() == 1
+          assert javadocArtifacts[0].buildDependencies.getDependencies(null).any { dep ->
+            dep.name == 'scaladoc' || dep.taskDependencies.getDependencies(dep).any { it.name == 'scaladoc' }
+          }
         }
       }
       """
@@ -524,7 +529,7 @@ final class ConventionsPluginTest {
   }
 
   @Test
-  void scalaBeforePublishIsRequired() throws IOException {
+  void publishBeforeScalaUsesScalaDoc() throws IOException {
     writeSettingsWithConventions();
     writeBuild(
       """
@@ -533,10 +538,28 @@ final class ConventionsPluginTest {
         id 'org.podval.conventions.publish'
         id 'scala'
       }
+      scala.scalaVersion = '3.9.0'
+      podvalPublish {
+        gitHubRepository = 'dubinsky/xml'
+      }
+      tasks.register('assertJavadocJar') {
+        doLast {
+          def jar = tasks.named('javadocJar', Jar).get()
+          assert jar.archiveClassifier.get() == 'javadoc'
+          assert jar.taskDependencies.getDependencies(jar).any { it.name == 'scaladoc' }
+          def javadocArtifacts = publishing.publications.library.artifacts.findAll { it.classifier == 'javadoc' }
+          assert javadocArtifacts.size() == 1
+          assert javadocArtifacts[0].buildDependencies.getDependencies(null).any { dep ->
+            dep.name == 'scaladoc' || dep.taskDependencies.getDependencies(dep).any { it.name == 'scaladoc' }
+          }
+        }
+      }
       """
     );
-    BuildResult result = runner("help").buildAndFail();
-    assertTrue(
+    BuildResult result = runner("help", "assertJavadocJar").build();
+    assertEquals(TaskOutcome.SUCCESS, result.task(":help").getOutcome());
+    assertEquals(TaskOutcome.SUCCESS, result.task(":assertJavadocJar").getOutcome());
+    assertFalse(
       result.getOutput().contains(
         "Apply scala before org.podval.conventions.publish so javadocJar is built from ScalaDoc"
       ),
@@ -570,12 +593,11 @@ final class ConventionsPluginTest {
   }
 
   @Test
-  void pluginPublishOrderFailureWhenLibraryAlreadyCreated() throws IOException {
+  void publishBeforeJavaGradlePluginDoesNotCreateLibrary() throws IOException {
     writeSettingsWithConventions();
     writeBuild(
       """
       plugins {
-        id 'java-library'
         id 'org.podval.conventions.publish'
         id 'java-gradle-plugin'
       }
@@ -590,15 +612,16 @@ final class ConventionsPluginTest {
           }
         }
       }
+      tasks.register('assertPublications') {
+        doLast {
+          assert publishing.publications.findByName('library') == null
+          assert publishing.publications.findByName('pluginMaven') != null
+        }
+      }
       """
     );
-    BuildResult result = runner("help").buildAndFail();
-    assertTrue(
-      result.getOutput().contains(
-        "Apply java-gradle-plugin or com.gradle.plugin-publish before org.podval.conventions.publish"
-      ),
-      result.getOutput()
-    );
+    BuildResult result = runner("assertPublications").build();
+    assertEquals(TaskOutcome.SUCCESS, result.task(":assertPublications").getOutcome());
   }
 
   @Test
@@ -672,6 +695,89 @@ final class ConventionsPluginTest {
     );
     BuildResult result = runner("assertPublications").build();
     assertEquals(TaskOutcome.SUCCESS, result.task(":assertPublications").getOutcome());
+  }
+
+  @Test
+  void javaGradlePluginAppliedFromLaterAfterEvaluateStillFails() throws IOException {
+    writeSettingsWithConventions();
+    writeBuild(
+      """
+      plugins {
+        id 'java-library'
+        id 'org.podval.conventions.publish'
+      }
+      podvalPublish { gitHubRepository = 'dubinsky/xml' }
+      afterEvaluate {
+        apply plugin: 'java-gradle-plugin'
+      }
+      """
+    );
+    BuildResult result = runner("help").buildAndFail();
+    assertTrue(
+      result.getOutput().contains(
+        "Apply java-gradle-plugin or com.gradle.plugin-publish before org.podval.conventions.publish"
+      ),
+      result.getOutput()
+    );
+  }
+
+  @Test
+  void preexistingJavadocJarStillFails() throws IOException {
+    writeSettingsWithConventions();
+    writeBuild(
+      """
+      plugins {
+        id 'scala'
+        id 'org.podval.conventions.publish'
+      }
+      tasks.register('javadocJar', Jar)
+      """
+    );
+    BuildResult result = runner("help").buildAndFail();
+    assertTrue(
+      result.getOutput().contains(
+        "Apply scala before org.podval.conventions.publish so javadocJar is built from ScalaDoc"
+      ),
+      result.getOutput()
+    );
+  }
+
+  @Test
+  void configurationCacheReusesScalaDocJavadocJar() throws IOException {
+    writeSettingsWithConventions();
+    writeBuild(
+      """
+      plugins {
+        id 'java-library'
+        id 'org.podval.conventions.publish'
+        id 'scala'
+      }
+      scala.scalaVersion = '3.9.0'
+      podvalPublish {
+        gitHubRepository = 'dubinsky/xml'
+      }
+      tasks.register('assertJavadocJar') {
+        def jar = tasks.named('javadocJar', Jar).get()
+        def classifier = jar.archiveClassifier.get()
+        def jarDependsOnScaladoc = jar.taskDependencies.getDependencies(jar).any { it.name == 'scaladoc' }
+        def publicationDependsOnScaladoc = publishing.publications.library.artifacts.any { artifact ->
+          artifact.classifier == 'javadoc' && artifact.buildDependencies.getDependencies(null).any { dep ->
+            dep.name == 'scaladoc' || dep.taskDependencies.getDependencies(dep).any { it.name == 'scaladoc' }
+          }
+        }
+        doLast {
+          assert classifier == 'javadoc'
+          assert jarDependsOnScaladoc
+          assert publicationDependsOnScaladoc
+        }
+      }
+      """
+    );
+    BuildResult first = runner("assertJavadocJar", "--configuration-cache").build();
+    assertEquals(TaskOutcome.SUCCESS, first.task(":assertJavadocJar").getOutcome());
+    BuildResult second = runner("assertJavadocJar", "--configuration-cache").build();
+    assertEquals(TaskOutcome.SUCCESS, second.task(":assertJavadocJar").getOutcome());
+    assertTrue(second.getOutput().contains("Reusing configuration cache."), second.getOutput());
   }
 
   @Test

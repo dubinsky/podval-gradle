@@ -17,10 +17,11 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Publishing: ScalaDoc {@code javadocJar} before {@code withJavadocJar()}, sources
- * jar, jar duplicates/manifest, Maven publication POM, in-memory signing.
- * Creates a {@code library} publication when {@code java} is present and
- * {@code java-gradle-plugin} is not. Applying {@code java-gradle-plugin} afterward fails.
+ * Publishing: sources jar, jar duplicates/manifest, Maven publication POM, in-memory signing.
+ * In {@code afterEvaluate}: ScalaDoc {@code javadocJar} before {@code withJavadocJar()}, then a
+ * {@code library} publication when {@code java} is present and {@code java-gradle-plugin} is not.
+ * Applying {@code java-gradle-plugin} from a later {@code afterEvaluate} after that publication
+ * was created fails.
  * Applies {@code maven-publish} and {@code signing}. Does not apply {@code java} or {@code scala}.
  */
 public final class ConventionsPublishPlugin implements Plugin<Project> {
@@ -47,7 +48,6 @@ public final class ConventionsPublishPlugin implements Plugin<Project> {
       );
     }));
 
-    project.getPluginManager().withPlugin("scala", unused -> registerJavadocJarFromScalaDoc(project));
     project.getPluginManager().withPlugin("java", unused -> configureJava(project, extension));
     project.getPluginManager().withPlugin("maven-publish", unused -> configurePublishing(project, extension));
     project.getPluginManager().withPlugin("signing", unused -> configureSigning(project));
@@ -55,10 +55,21 @@ public final class ConventionsPublishPlugin implements Plugin<Project> {
     project.getPluginManager().apply("maven-publish");
     project.getPluginManager().apply("signing");
 
-    project.getPluginManager().withPlugin("java", unused -> maybeCreateLibraryPublication(project));
     project.getPluginManager().withPlugin(JAVA_GRADLE_PLUGIN_ID, unused -> {
       configureGradlePluginMetadata(project, extension);
       rejectLateGradlePlugin(project);
+    });
+
+    project.afterEvaluate(ignored -> {
+      if (project.getPluginManager().hasPlugin("scala")) {
+        registerJavadocJarFromScalaDoc(project);
+      }
+      if (project.getPluginManager().hasPlugin("java")) {
+        project.getExtensions().getByType(JavaPluginExtension.class).withJavadocJar();
+      }
+      if (project.getPluginManager().hasPlugin("java")) {
+        maybeCreateLibraryPublication(project);
+      }
     });
   }
 
@@ -81,7 +92,6 @@ public final class ConventionsPublishPlugin implements Plugin<Project> {
   private static void configureJava(Project project, PublishExtension extension) {
     JavaPluginExtension java = project.getExtensions().getByType(JavaPluginExtension.class);
     java.withSourcesJar();
-    java.withJavadocJar();
     project.getTasks().named(JavaPlugin.JAR_TASK_NAME, Jar.class, jar -> {
       jar.setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE);
       Provider<String> vendor = extension.getOrgName();

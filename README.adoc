@@ -46,7 +46,10 @@ Maven publication POM (SCM, issues, CI, Apache-2.0, developer) and in-memory sig
 `signingPassword`.
 Creates a `library` publication for Java libraries.
 Does not create `library` for Gradle plugin projects (`pluginMaven` and marker publications are those coordinates).
-Apply `java-gradle-plugin` or `com.gradle.plugin-publish` before this plugin.
+`scala` or `java-gradle-plugin` and this plugin work in either order in the same build script, because that work runs in
+`afterEvaluate`.
+Applying `java-gradle-plugin` from a later `afterEvaluate` still fails with
+`Apply java-gradle-plugin or com.gradle.plugin-publish before org.podval.conventions.publish`.
 Sets `gradlePlugin.website` / `vcsUrl` from `gitHubRepository`.
 
 `org.podval.conventions` does not apply `scala` or `java` — the consumer still does.
@@ -224,10 +227,12 @@ Central publishing is `podvalCentral=true` in `gradle.properties`.
 The settings plugin then applies nmcp 1.6.2 with `publishingType = USER_MANAGED`.
 Sites leave the property unset.
 
-Apply `scala` (when used) **before** `org.podval.conventions.publish` so `javadocJar` is registered from ScalaDoc before
-`withJavadocJar()` reuses it.
-The other order fails with `Apply scala before org.podval.conventions.publish so javadocJar is built from ScalaDoc`.
-Apply `java-gradle-plugin` or `com.gradle.plugin-publish` **before** `org.podval.conventions.publish`.
+`scala` and `org.podval.conventions.publish` work in either order in the same build script.
+`java-gradle-plugin` or `com.gradle.plugin-publish` and this plugin do too.
+The ScalaDoc `javadocJar`, `withJavadocJar()`, and the `library` publication run in `afterEvaluate`, after the plugins
+in that script are applied.
+Applying `java-gradle-plugin` from a later `afterEvaluate` still fails with
+`Apply java-gradle-plugin or com.gradle.plugin-publish before org.podval.conventions.publish`.
 `library` is created for Java libraries and is not created for Gradle plugin projects.
 `pluginMaven` and marker publications are the plugin coordinates.
 
