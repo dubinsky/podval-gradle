@@ -1003,6 +1003,35 @@ final class ConventionsPluginTest {
   }
 
   @Test
+  void withJavadocJarBeforePublishUsesScalaDoc() throws IOException {
+    writeSettingsWithConventions();
+    writeBuild(
+      """
+      plugins {
+        id 'scala'
+      }
+      java.withJavadocJar()
+      apply plugin: 'org.podval.conventions.publish'
+      scala.scalaVersion = '3.9.0'
+      podvalPublish {
+        gitHubRepository = 'dubinsky/scalajs-gradle'
+      }
+      tasks.register('assertJavadocJar') {
+        doLast {
+          def jar = tasks.named('javadocJar', Jar).get()
+          def dependencies = jar.taskDependencies.getDependencies(jar)*.name
+          assert jar.archiveClassifier.get() == 'javadoc'
+          assert dependencies.contains('scaladoc')
+          assert !dependencies.contains('javadoc')
+        }
+      }
+      """
+    );
+    BuildResult result = runner("assertJavadocJar").build();
+    assertEquals(TaskOutcome.SUCCESS, result.task(":assertJavadocJar").getOutcome());
+  }
+
+  @Test
   void configurationCacheReusesScalaDocJavadocJar() throws IOException {
     writeSettingsWithConventions();
     writeBuild(

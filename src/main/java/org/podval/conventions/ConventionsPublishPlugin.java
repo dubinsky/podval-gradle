@@ -3,18 +3,24 @@ package org.podval.conventions;
 import org.gradle.api.GradleException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
+import org.gradle.api.Task;
 import org.gradle.api.component.SoftwareComponent;
+import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.DuplicatesStrategy;
+import org.gradle.api.internal.file.copy.CopySpecInternal;
+import org.gradle.api.internal.file.copy.DefaultCopySpec;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.plugins.JavaPluginExtension;
 import org.gradle.api.provider.Provider;
 import org.gradle.api.publish.PublishingExtension;
 import org.gradle.api.publish.maven.MavenPublication;
+import org.gradle.api.tasks.TaskProvider;
 import org.gradle.api.tasks.bundling.Jar;
 import org.gradle.plugin.devel.GradlePluginDevelopmentExtension;
 import org.gradle.plugins.signing.SigningExtension;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Publishing: sources jar, jar duplicates/manifest, Maven publication POM, in-memory signing.
@@ -85,19 +91,85 @@ public final class ConventionsPublishPlugin implements Plugin<Project> {
   }
 
   private static void registerJavadocJarFromScalaDoc(Project project) {
-    if (project.getTasks().getNames().contains("javadocJar")) {
+    if (!project.getTasks().getNames().contains("javadocJar")) {
+      project.getTasks().register("javadocJar", Jar.class, jar -> configureScalaDocJar(project, jar));
+      return;
+    }
+    // com.gradle.plugin-publish calls withJavadocJar() during its apply, so this task
+    // already packages the javadoc task. CopySpec has no public setter for that source.
+    Jar jar = project.getTasks().named("javadocJar", Jar.class).get();
+    CopySpecInternal root = jar.getRootSpec();
+    if (sourcesInclude(root, "scaladoc")) {
+      return;
+    }
+    if (!retargetJavadoc(root, project.getTasks().named("scaladoc"))) {
       throw new GradleException(
         "Apply scala before org.podval.conventions.publish so javadocJar is built from ScalaDoc"
       );
     }
-    project.getTasks().register("javadocJar", Jar.class, jar -> {
-      jar.setGroup("build");
-      jar.setDescription(
-        "Assembles a jar archive containing the ScalaDoc (Maven Central -javadoc classifier)."
-      );
-      jar.from(project.getTasks().named("scaladoc"));
-      jar.getArchiveClassifier().set("javadoc");
-    });
+    jar.setDescription(
+      "Assembles a jar archive containing the ScalaDoc (Maven Central -javadoc classifier)."
+    );
+  }
+
+  private static void configureScalaDocJar(Project project, Jar jar) {
+    jar.setGroup("build");
+    jar.setDescription(
+      "Assembles a jar archive containing the ScalaDoc (Maven Central -javadoc classifier)."
+    );
+    jar.from(project.getTasks().named("scaladoc"));
+    jar.getArchiveClassifier().set("javadoc");
+  }
+
+  private static ConfigurableFileCollection sourcePaths(DefaultCopySpec spec) {
+    return (ConfigurableFileCollection) spec.getSourceRootsForThisSpec();
+  }
+
+  private static boolean sourcesInclude(CopySpecInternal spec, String taskName) {
+    if (spec instanceof DefaultCopySpec copy && namesTask(sourcePaths(copy).getFrom(), taskName)) {
+      return true;
+    }
+    for (CopySpecInternal child : spec.getChildren()) {
+      if (sourcesInclude(child, taskName)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean retargetJavadoc(CopySpecInternal spec, Object scaladoc) {
+    if (spec instanceof DefaultCopySpec copy) {
+      ConfigurableFileCollection sources = sourcePaths(copy);
+      if (namesTask(sources.getFrom(), "javadoc")) {
+        sources.setFrom(scaladoc);
+        return true;
+      }
+    }
+    for (CopySpecInternal child : spec.getChildren()) {
+      if (retargetJavadoc(child, scaladoc)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean namesTask(Set<Object> paths, String taskName) {
+    for (Object path : paths) {
+      if (taskName.equals(taskNameOf(path))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static String taskNameOf(Object path) {
+    if (path instanceof Task task) {
+      return task.getName();
+    }
+    if (path instanceof TaskProvider<?> provider) {
+      return provider.getName();
+    }
+    return null;
   }
 
   private static void configureJava(Project project, PublishExtension extension) {

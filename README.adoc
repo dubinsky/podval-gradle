@@ -245,6 +245,9 @@ Sites leave the property unset.
 `java-gradle-plugin` or `com.gradle.plugin-publish` and this plugin do too.
 The ScalaDoc `javadocJar`, `withJavadocJar()`, and the `library` publication run in `afterEvaluate`, after the plugins
 in that script are applied.
+A `javadocJar` that `withJavadocJar()` already created is switched from the `javadoc` task to `scaladoc`.
+A `javadocJar` created some other way still fails with
+`Apply scala before org.podval.conventions.publish so javadocJar is built from ScalaDoc`.
 Applying `java-gradle-plugin` from a later `afterEvaluate` still fails with
 `Apply java-gradle-plugin or com.gradle.plugin-publish before org.podval.conventions.publish`.
 `library` is created for Java libraries and is not created for Gradle plugin projects.
