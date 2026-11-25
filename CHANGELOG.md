@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- Scala 2 compiles get `-feature` and `-release:N`.
+  `-new-syntax`, `-language:strictEquality`, `-source:future`, and `-java-output-version` stay on Scala 3.
 - chore: elf-apply published `0.4.0`
 - chore: Gradle 9.9.1
 - chore: Gradle 9.9.2

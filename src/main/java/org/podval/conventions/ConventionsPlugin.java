@@ -70,7 +70,10 @@ public final class ConventionsPlugin implements Plugin<Project> {
       }
     }
 
-    String javaOutputFlag = "-java-output-version:" + podval.getJavaOutputVersion().get();
+    // Scala 2 rejects -new-syntax, -language:strictEquality, -source:future, and -java-output-version.
+    boolean scala2 = scala2(scalaCompile);
+    String javaOutputFlag = (scala2 ? "-release:" : "-java-output-version:")
+      + podval.getJavaOutputVersion().get();
     List<String> current = scalaCompile.getScalaCompileOptions().getAdditionalParameters();
     List<String> merged = new ArrayList<>();
     if (current != null) {
@@ -85,10 +88,29 @@ public final class ConventionsPlugin implements Plugin<Project> {
     }
     merged.add(0, javaOutputFlag);
     for (String flag : extensionFlags) {
+      if (scala2 && scala3Only(flag)) {
+        continue;
+      }
       if (!merged.contains(flag)) {
         merged.add(flag);
       }
     }
     scalaCompile.getScalaCompileOptions().setAdditionalParameters(merged);
+  }
+
+  private static boolean scala2(ScalaCompile scalaCompile) {
+    ScalaPluginExtension scala =
+      scalaCompile.getProject().getExtensions().findByType(ScalaPluginExtension.class);
+    if (scala == null) {
+      return false;
+    }
+    String version = scala.getScalaVersion().getOrNull();
+    return version != null && (version.startsWith("2.") || version.equals("2"));
+  }
+
+  private static boolean scala3Only(String flag) {
+    return "-new-syntax".equals(flag)
+      || "-language:strictEquality".equals(flag)
+      || "-source:future".equals(flag);
   }
 }

@@ -248,6 +248,39 @@ final class ConventionsPluginTest {
   }
 
   @Test
+  void scala2FlagsOmitScala3Options() throws IOException {
+    writeSettingsWithConventions();
+    writeBuild(
+      """
+      plugins {
+        id 'scala'
+        id 'org.podval.conventions'
+      }
+      scala.scalaVersion = '2.13.18'
+      podval.javaOutputVersion = 17
+      tasks.named('compileScala').configure {
+        scalaCompileOptions.additionalParameters = ['-Ytasty-reader', '-release:21']
+      }
+      tasks.register('assertScala2') {
+        doLast {
+          def params = tasks.named('compileScala').get().scalaCompileOptions.additionalParameters
+          assert params[0] == '-release:17'
+          assert params.contains('-Ytasty-reader')
+          assert params.contains('-feature')
+          assert !params.any { it.startsWith('-java-output-version') }
+          assert !params.contains('-new-syntax')
+          assert !params.contains('-language:strictEquality')
+          assert !params.contains('-source:future')
+          assert params.count { it.startsWith('-release') || it.startsWith('--release') } == 1
+        }
+      }
+      """
+    );
+    BuildResult result = runner("assertScala2").build();
+    assertEquals(TaskOutcome.SUCCESS, result.task(":assertScala2").getOutcome());
+  }
+
+  @Test
   void conventionsWithoutJavaDoesNotApplyJava() throws IOException {
     writeSettingsWithConventions();
     writeBuild(

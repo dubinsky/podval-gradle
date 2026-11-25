@@ -27,7 +27,9 @@ Creates the `podval` extension.
 If `java` is present (covers `java-library` / `scala`): the Java toolchain `languageVersion` is conventioned to
 `podval.jvmLanguageVersion` (default 25).
 If `scala` is present: compiler parameters from `podval.scalaCompilerParameters` (`-new-syntax`, `-feature`,
-`-language:strictEquality`, `-source:future`) and `-java-output-version:N` from `podval.javaOutputVersion`,
+`-language:strictEquality`, `-source:future`) and `-java-output-version:N` from `podval.javaOutputVersion`.
+Scala 2 gets `-feature` and `-release:N`.
+It does not get `-new-syntax`, `-language:strictEquality`, `-source:future`, or `-java-output-version`.
 `scala.scalaVersion` from the `scalaVersion` Gradle property when that property is set, and `scala.zincVersion`
 conventioned to `1.12.1`.
 `compileJava` stays enabled by default, and `podval.compileJavaEnabled = false` disables that project's `compileJava`
@@ -167,7 +169,10 @@ podval {
 
 `scalaCompilerParameters` starts as `-new-syntax`, `-feature`, `-language:strictEquality`, and `-source:future`.
 `javaOutputVersion` follows `jvmLanguageVersion` until set.
-The emitted flag is `-java-output-version:N`.
+Scala 3 is passed `-java-output-version:N` plus that list.
+Scala 2 is passed `-release:N` and `-feature`.
+`-new-syntax`, `-language:strictEquality`, and `-source:future` are Scala 3 options, so they are left off a Scala 2
+compile.
 A `-release` or `-java-output-version` entry in the list fails.
 Edit the list in the build script.
 `allowJdkRestrictedAccess()` adds `--enable-native-access=ALL-UNNAMED` and `--sun-misc-unsafe-memory-access=allow` to
