@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- Self-apply published `0.5.0`.
 
 ## [0.5.0] - 2026-11-24
 - A `javadocJar` that `withJavadocJar()` already created is switched to ScalaDoc.
