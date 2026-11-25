@@ -642,6 +642,119 @@ final class ConventionsPluginTest {
   }
 
   @Test
+  void gitHubRepositoryFromGradleProperty() throws IOException {
+    writeSettingsWithConventions();
+    Files.writeString(
+      projectDir.resolve("gradle.properties"),
+      "gitHubRepository=dubinsky/xml\n",
+      StandardCharsets.UTF_8
+    );
+    writeBuild(
+      """
+      plugins {
+        id 'java-library'
+        id 'maven-publish'
+        id 'org.podval.conventions.publish'
+      }
+      """
+    );
+    BuildResult result = runner("generatePomFileForLibraryPublication").build();
+    assertEquals(TaskOutcome.SUCCESS, result.task(":generatePomFileForLibraryPublication").getOutcome());
+    String pom = Files.readString(projectDir.resolve("build/publications/library/pom-default.xml"));
+    assertTrue(pom.contains("https://github.com/dubinsky/xml"), pom);
+  }
+
+  @Test
+  void gitHubRepositoryExtensionOverridesProperty() throws IOException {
+    writeSettingsWithConventions();
+    Files.writeString(
+      projectDir.resolve("gradle.properties"),
+      "gitHubRepository=other/repo\n",
+      StandardCharsets.UTF_8
+    );
+    writeBuild(
+      """
+      plugins {
+        id 'java-library'
+        id 'maven-publish'
+        id 'org.podval.conventions.publish'
+      }
+      podvalPublish {
+        gitHubRepository = 'dubinsky/xml'
+      }
+      """
+    );
+    BuildResult result = runner("generatePomFileForLibraryPublication").build();
+    assertEquals(TaskOutcome.SUCCESS, result.task(":generatePomFileForLibraryPublication").getOutcome());
+    String pom = Files.readString(projectDir.resolve("build/publications/library/pom-default.xml"));
+    assertTrue(pom.contains("https://github.com/dubinsky/xml"), pom);
+    assertFalse(pom.contains("other/repo"), pom);
+  }
+
+  @Test
+  void gitHubRepositoryPropertyVisibleToSubproject() throws IOException {
+    writeSettings(
+      """
+      plugins {
+        id 'org.podval.conventions.settings'
+      }
+      include 'lib'
+      rootProject.name = 'conventions-test'
+      """
+    );
+    Files.writeString(
+      projectDir.resolve("gradle.properties"),
+      "gitHubRepository=dubinsky/xml\n",
+      StandardCharsets.UTF_8
+    );
+    writeBuild("");
+    Files.createDirectories(projectDir.resolve("lib"));
+    Files.writeString(
+      projectDir.resolve("lib/build.gradle"),
+      """
+      plugins {
+        id 'java-library'
+        id 'org.podval.conventions.publish'
+      }
+      """,
+      StandardCharsets.UTF_8
+    );
+    BuildResult result = runner(":lib:generatePomFileForLibraryPublication").build();
+    assertEquals(
+      TaskOutcome.SUCCESS,
+      result.task(":lib:generatePomFileForLibraryPublication").getOutcome()
+    );
+    String pom = Files.readString(
+      projectDir.resolve("lib/build/publications/library/pom-default.xml")
+    );
+    assertTrue(pom.contains("https://github.com/dubinsky/xml"), pom);
+  }
+
+  @Test
+  void configurationCacheReusesGitHubRepositoryProperty() throws IOException {
+    writeSettingsWithConventions();
+    Files.writeString(
+      projectDir.resolve("gradle.properties"),
+      "gitHubRepository=dubinsky/xml\n",
+      StandardCharsets.UTF_8
+    );
+    writeBuild(
+      """
+      plugins {
+        id 'java-library'
+        id 'org.podval.conventions.publish'
+      }
+      """
+    );
+    runner("generatePomFileForLibraryPublication", "--configuration-cache").build();
+    BuildResult second = runner(
+      "generatePomFileForLibraryPublication",
+      "--configuration-cache"
+    ).build();
+    assertTrue(second.getOutput().contains("Reusing configuration cache."), second.getOutput());
+  }
+
+  @Test
   void scalaJavadocJarBeforeWithJavadocJar() throws IOException {
     writeSettingsWithConventions();
     writeBuild(

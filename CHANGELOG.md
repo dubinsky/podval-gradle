@@ -25,6 +25,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   Explicit `podval.compileJavaEnabled` true or false wins.
   `compileTestJava` is not affected.
   Generated directories count only when their files are visible before `compileJava` is realized.
+- `podvalPublish.gitHubRepository` may be the Gradle property `gitHubRepository`.
+  An extension assignment wins.
+  When both are absent, configuration still throws `podvalPublish.gitHubRepository is required (e.g. 'dubinsky/xml')`.
 
 ## [0.4.0] - 2026-11-09
 - Self-apply published `0.3.0`.

@@ -219,7 +219,7 @@ plugins {
   id 'org.podval.conventions.publish'
 }
 podvalPublish {
-  gitHubRepository = 'dubinsky/xml'   // required
+  gitHubRepository = 'dubinsky/xml'   // assignment wins over the Gradle property
   name = 'Podval XML'                 // POM <name>; default project.name
   inceptionYear = '2026'
   orgName = 'Podval Group'            // default
@@ -227,6 +227,10 @@ podvalPublish {
   developerEmail = 'dub@podval.org'   // default
 }
 ----
+
+`gitHubRepository` may be the Gradle property of the same name.
+The extension assignment wins.
+When both are absent, configuration throws `podvalPublish.gitHubRepository is required (e.g. 'dubinsky/xml')`.
 
 OpenTorah uses this publish plugin with `orgName = 'Open Torah Project'` / `developerEmail = 'dub@opentorah.org'`.
 Do not special-case OpenTorah in the plugin code.

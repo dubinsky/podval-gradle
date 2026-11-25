@@ -42,11 +42,22 @@ public final class ConventionsPublishPlugin implements Plugin<Project> {
     extension.getOrgUrl().convention(DEFAULT_ORG_URL);
     extension.getDeveloperEmail().convention(DEFAULT_DEVELOPER_EMAIL);
     extension.getName().convention(project.provider(project::getName));
-    extension.getGitHubRepository().convention(project.getProviders().provider(() -> {
-      throw new GradleException(
-        "podvalPublish.gitHubRepository is required (e.g. 'dubinsky/xml')"
-      );
-    }));
+    // gradleProperty stays changing, so configuration cache probes the orElse fallback
+    // even when the property is present. Return it again instead of throwing.
+    Provider<String> gitHubRepository = project.getProviders().gradleProperty("gitHubRepository");
+    extension.getGitHubRepository().convention(
+      gitHubRepository.orElse(
+        project.getProviders().provider(() -> {
+          String value = gitHubRepository.getOrNull();
+          if (value != null) {
+            return value;
+          }
+          throw new GradleException(
+            "podvalPublish.gitHubRepository is required (e.g. 'dubinsky/xml')"
+          );
+        })
+      )
+    );
 
     project.getPluginManager().withPlugin("java", unused -> configureJava(project, extension));
     project.getPluginManager().withPlugin("maven-publish", unused -> configurePublishing(project, extension));

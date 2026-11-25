@@ -4,7 +4,7 @@ import org.gradle.api.provider.Property;
 
 /** Consumer-facing {@code podvalPublish { }} block. POM fields that differ per repo. */
 public abstract class PublishExtension {
-  /** GitHub {@code owner/repo}, e.g. {@code dubinsky/xml}. Required. */
+  /** GitHub {@code owner/repo}, e.g. {@code dubinsky/xml}. Gradle property {@code gitHubRepository}, else required. */
   public abstract Property<String> getGitHubRepository();
 
   /** POM {@code <name>}. Default: {@code project.name}. */
