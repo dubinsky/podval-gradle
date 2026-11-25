@@ -20,6 +20,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `scala` or `java-gradle-plugin` and this plugin work in either order in the same build script.
   Applying `java-gradle-plugin` from a later `afterEvaluate` still fails with
   `Apply java-gradle-plugin or com.gradle.plugin-publish before org.podval.conventions.publish`.
+- `compileJava` is disabled when `sourceSets.main.java` is empty.
+  The convention is read when `compileJava` is configured.
+  Explicit `podval.compileJavaEnabled` true or false wins.
+  `compileTestJava` is not affected.
+  Generated directories count only when their files are visible before `compileJava` is realized.
 
 ## [0.4.0] - 2026-11-09
 - Self-apply published `0.3.0`.

@@ -3,9 +3,11 @@ package org.podval.conventions;
 import org.gradle.api.GradleException;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
+import org.gradle.api.file.SourceDirectorySet;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.plugins.JavaPluginExtension;
 import org.gradle.api.plugins.scala.ScalaPluginExtension;
+import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.compile.JavaCompile;
 import org.gradle.api.tasks.scala.ScalaCompile;
 import org.gradle.jvm.toolchain.JavaLanguageVersion;
@@ -15,9 +17,10 @@ import java.util.List;
 /**
  * {@code podval} extension, Java toolchain convention when {@code java} is present
  * (covers {@code java-library} and {@code scala}), and Scala flags when {@code scala}
- * is present. Does not apply {@code java} or {@code scala}. Does not skip
- * {@code compileJava} by default; {@code compileJavaEnabled = false} disables that
- * project's {@code compileJava} only. Does not call {@code allowJdkRestrictedAccess}.
+ * is present. Does not apply {@code java} or {@code scala}. Disables {@code compileJava}
+ * when the main Java source set is empty; the check is read when that task is configured.
+ * An explicit {@code compileJavaEnabled} still wins and only that project's
+ * {@code compileJava} changes. Does not call {@code allowJdkRestrictedAccess}.
  * {@code dependencyUpdates} comes from {@code org.podval.conventions.settings}.
  */
 public final class ConventionsPlugin implements Plugin<Project> {
@@ -32,7 +35,9 @@ public final class ConventionsPlugin implements Plugin<Project> {
     podval.getJavaOutputVersion().convention(
       podval.getJvmLanguageVersion().map(JavaLanguageVersion::asInt)
     );
-    podval.getCompileJavaEnabled().convention(true);
+    podval.getCompileJavaEnabled().convention(project.provider(
+      () -> mainJavaSourcesPresent(project)
+    ));
 
     project.getPluginManager().withPlugin("java", unused -> {
       JavaPluginExtension java = project.getExtensions().getByType(JavaPluginExtension.class);
@@ -58,6 +63,19 @@ public final class ConventionsPlugin implements Plugin<Project> {
     project.afterEvaluate(ignored -> project.getTasks().withType(ScalaCompile.class).configureEach(
       scalaCompile -> applyScalaFlags(scalaCompile, podval)
     ));
+  }
+
+  private static boolean mainJavaSourcesPresent(Project project) {
+    JavaPluginExtension javaExtension = project.getExtensions().findByType(JavaPluginExtension.class);
+    if (javaExtension == null) {
+      // Realized before java is applied: do not disable a task this plugin does not own.
+      return true;
+    }
+    SourceDirectorySet javaSourceSet = javaExtension
+      .getSourceSets()
+      .getByName(SourceSet.MAIN_SOURCE_SET_NAME)
+      .getJava();
+    return !javaSourceSet.isEmpty();
   }
 
   private static void applyScalaFlags(ScalaCompile scalaCompile, ConventionsExtension podval) {

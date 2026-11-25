@@ -266,16 +266,96 @@ final class ConventionsPluginTest {
   }
 
   @Test
-  void compileJavaOptInIsPerProject() throws IOException {
+  void compileJavaDisabledWhenMainSourceSetEmpty() throws IOException {
+    writeSettingsWithConventions();
+    writeBuild(
+      """
+      plugins {
+        id 'java-library'
+        id 'org.podval.conventions'
+      }
+      gradle.projectsEvaluated {
+        assert !tasks.named('compileJava').get().enabled
+        assert tasks.named('compileTestJava').get().enabled
+        assert !gradle.startParameter.excludedTaskNames.contains('compileJava')
+      }
+      """
+    );
+    BuildResult result = runner("help").build();
+    assertTrue(result.getOutput().contains("BUILD SUCCESSFUL"), result.getOutput());
+  }
+
+  @Test
+  void compileJavaStaysEnabledWhenMainSourceHasFiles() throws IOException {
+    writeSettingsWithConventions();
+    writeJavaSource("src/main/java/Hello.java");
+    writeBuild(
+      """
+      plugins {
+        id 'java-library'
+        id 'org.podval.conventions'
+      }
+      gradle.projectsEvaluated {
+        assert tasks.named('compileJava').get().enabled
+      }
+      """
+    );
+    BuildResult result = runner("help").build();
+    assertTrue(result.getOutput().contains("BUILD SUCCESSFUL"), result.getOutput());
+  }
+
+  @Test
+  void compileJavaExplicitTrueOverridesEmptySourceSet() throws IOException {
+    writeSettingsWithConventions();
+    writeBuild(
+      """
+      plugins {
+        id 'java-library'
+        id 'org.podval.conventions'
+      }
+      podval.compileJavaEnabled = true
+      gradle.projectsEvaluated {
+        assert tasks.named('compileJava').get().enabled
+      }
+      """
+    );
+    BuildResult result = runner("help").build();
+    assertTrue(result.getOutput().contains("BUILD SUCCESSFUL"), result.getOutput());
+  }
+
+  @Test
+  void compileJavaExplicitFalseOverridesPresentSources() throws IOException {
+    writeSettingsWithConventions();
+    writeJavaSource("src/main/java/Hello.java");
+    writeBuild(
+      """
+      plugins {
+        id 'java-library'
+        id 'org.podval.conventions'
+      }
+      podval.compileJavaEnabled = false
+      gradle.projectsEvaluated {
+        assert !tasks.named('compileJava').get().enabled
+        assert tasks.named('compileTestJava').get().enabled
+      }
+      """
+    );
+    BuildResult result = runner("help").build();
+    assertTrue(result.getOutput().contains("BUILD SUCCESSFUL"), result.getOutput());
+  }
+
+  @Test
+  void compileJavaEnabledIsPerProject() throws IOException {
     writeSettings(
       """
       plugins {
         id 'org.podval.conventions.settings'
       }
       include 'lib'
-      rootProject.name = 'compile-java-opt-in'
+      rootProject.name = 'compile-java-per-project'
       """
     );
+    writeJavaSource("src/main/java/Hello.java");
     writeBuild(
       """
       plugins {
@@ -284,7 +364,7 @@ final class ConventionsPluginTest {
       }
       gradle.projectsEvaluated {
         assert rootProject.tasks.named('compileJava').get().enabled
-        assert !gradle.startParameter.excludedTaskNames.contains('compileJava')
+        assert rootProject.tasks.named('compileTestJava').get().enabled
         def lib = rootProject.project(':lib')
         assert !lib.tasks.named('compileJava').get().enabled
         assert lib.tasks.named('compileTestJava').get().enabled
@@ -299,12 +379,79 @@ final class ConventionsPluginTest {
         id 'java-library'
         id 'org.podval.conventions'
       }
-      podval.compileJavaEnabled = false
       """,
       StandardCharsets.UTF_8
     );
     BuildResult result = runner("help").build();
     assertTrue(result.getOutput().contains("BUILD SUCCESSFUL"), result.getOutput());
+  }
+
+  @Test
+  void generatedJavaSrcDirPresentBeforeCompileJavaCounts() throws IOException {
+    writeSettingsWithConventions();
+    writeBuild(
+      """
+      plugins {
+        id 'java-library'
+        id 'org.podval.conventions'
+      }
+      file('gen').mkdirs()
+      file('gen/Gen.java').text = 'class Gen {}'
+      sourceSets.main.java.srcDir 'gen'
+      gradle.projectsEvaluated {
+        assert tasks.named('compileJava').get().enabled
+      }
+      """
+    );
+    BuildResult result = runner("help").build();
+    assertTrue(result.getOutput().contains("BUILD SUCCESSFUL"), result.getOutput());
+  }
+
+  @Test
+  void configurationCacheReusesCompileJavaEnabled() throws IOException {
+    writeSettingsWithConventions();
+    writeBuild(
+      """
+      plugins {
+        id 'java-library'
+        id 'org.podval.conventions'
+      }
+      tasks.register('assertCompileJava') {
+        def compileJavaEnabled = tasks.named('compileJava').get().enabled
+        def compileTestJavaEnabled = tasks.named('compileTestJava').get().enabled
+        doLast {
+          assert !compileJavaEnabled
+          assert compileTestJavaEnabled
+        }
+      }
+      """
+    );
+    BuildResult emptyFirst = runner("assertCompileJava", "--configuration-cache").build();
+    assertEquals(TaskOutcome.SUCCESS, emptyFirst.task(":assertCompileJava").getOutcome());
+    BuildResult emptySecond = runner("assertCompileJava", "--configuration-cache").build();
+    assertEquals(TaskOutcome.SUCCESS, emptySecond.task(":assertCompileJava").getOutcome());
+    assertTrue(emptySecond.getOutput().contains("Reusing configuration cache."), emptySecond.getOutput());
+
+    writeJavaSource("src/main/java/Hello.java");
+    writeBuild(
+      """
+      plugins {
+        id 'java-library'
+        id 'org.podval.conventions'
+      }
+      tasks.register('assertCompileJava') {
+        def compileJavaEnabled = tasks.named('compileJava').get().enabled
+        doLast {
+          assert compileJavaEnabled
+        }
+      }
+      """
+    );
+    BuildResult presentFirst = runner("assertCompileJava", "--configuration-cache").build();
+    assertEquals(TaskOutcome.SUCCESS, presentFirst.task(":assertCompileJava").getOutcome());
+    BuildResult presentSecond = runner("assertCompileJava", "--configuration-cache").build();
+    assertEquals(TaskOutcome.SUCCESS, presentSecond.task(":assertCompileJava").getOutcome());
+    assertTrue(presentSecond.getOutput().contains("Reusing configuration cache."), presentSecond.getOutput());
   }
 
   @Test
@@ -1578,6 +1725,12 @@ final class ConventionsPluginTest {
 
   private void writeBuild(String buildGradle) throws IOException {
     Files.writeString(projectDir.resolve("build.gradle"), buildGradle, StandardCharsets.UTF_8);
+  }
+
+  private void writeJavaSource(String relativePath) throws IOException {
+    Path source = projectDir.resolve(relativePath);
+    Files.createDirectories(source.getParent());
+    Files.writeString(source, "class Hello {}\n", StandardCharsets.UTF_8);
   }
 
   private GradleRunner runner(String... arguments) {

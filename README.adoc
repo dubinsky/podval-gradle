@@ -35,8 +35,11 @@ Scala 2 gets `-feature` and `-release:N`.
 It does not get `-new-syntax`, `-language:strictEquality`, `-source:future`, or `-java-output-version`.
 `scala.scalaVersion` from the `scalaVersion` Gradle property when that property is set, and `scala.zincVersion`
 conventioned to `1.12.1`.
-`compileJava` stays enabled by default, and `podval.compileJavaEnabled = false` disables that project's `compileJava`
-only (not `compileTestJava`, not the whole build's excluded-task list).
+`compileJava` is enabled when `sourceSets.main.java` is not empty, read when `compileJava` is configured.
+Explicit `podval.compileJavaEnabled = true` and `= false` win.
+`compileTestJava` is not affected, and the build's excluded-task list is not changed.
+Generated directories count only if their files are visible before `compileJava` is realized; otherwise set
+`podval.compileJavaEnabled = true`.
 Does **not** call `allowJdkRestrictedAccess()`.
 `org.podval.conventions.publish` (`build.gradle`; libraries and Gradle-plugin projects)::
 Applies `maven-publish` and `signing`.
@@ -196,6 +199,13 @@ There is no default Scala version.
 
 The Java toolchain `languageVersion` is conventioned to `podval.jvmLanguageVersion` (default 25).
 A prior or later `java.toolchain.languageVersion.set` wins for compilation and does not write back into the extension.
+
+`compileJava` is enabled when `sourceSets.main.java` is not empty.
+That convention is read when `compileJava` is configured.
+Explicit `podval.compileJavaEnabled = true` and `= false` win.
+`compileTestJava` is not affected.
+Generated directories count only if their files are visible before `compileJava` is realized; otherwise set
+`podval.compileJavaEnabled = true`.
 
 == Publish extension
 
